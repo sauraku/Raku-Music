@@ -7,8 +7,8 @@ class AppConfig {
   static Future<Directory> getAppConfigDirectory() async {
     // For Linux, we want to store in ~/.local/share/raku_music
     // path_provider's getApplicationSupportDirectory usually maps to:
-    // Linux: /home/user/.local/share/com.example.raku_music (or similar based on app ID)
-    // Android: /data/user/0/com.example.raku_music/files
+    // Linux: /home/user/.local/share/com.sauraku.raku_music (or similar based on app ID)
+    // Android: /data/user/0/com.sauraku.raku_music/files
     
     // However, the user specifically asked for ~/.local for application information.
     // Standard XDG Base Directory specification says user data should go to $XDG_DATA_HOME,

@@ -3,8 +3,8 @@
 # Define variables
 PROD_APP_NAME="Raku Music"
 DEV_APP_NAME="Raku Music Dev"
-PROD_APP_ID="com.example.raku_music"
-DEV_APP_ID="com.example.raku_music.dev"
+PROD_APP_ID="com.sauraku.raku_music"
+DEV_APP_ID="com.sauraku.raku_music.dev"
 
 BINARY_NAME="raku_music"
 INSTALL_DIR="$HOME/.local/share/raku_music"

@@ -32,14 +32,24 @@ This project is designed for Linux.
 ### Installation
 
 1.  Clone the repository.
-2.  Install dependencies:
+2.  Make the installation script executable:
     ```bash
-    flutter pub get
+    chmod +x install.sh
     ```
-3.  Run the app:
+3.  Run the script:
     ```bash
-    flutter run -d linux
+    ./install.sh
     ```
+    This will build the release version of the app and install it to `~/.local/share/raku_music`, and create a desktop entry.
+
+### Uninstallation
+
+To remove the application from your system, run the uninstallation script:
+
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
 
 ## Project Structure
 

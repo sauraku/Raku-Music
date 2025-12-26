@@ -88,7 +88,7 @@ void main() async {
   _audioHandler = await AudioService.init(
     builder: () => PlayerManager(),
     config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.example.raku_music.channel.audio',
+      androidNotificationChannelId: 'com.sauraku.raku_music.channel.audio',
       androidNotificationChannelName: 'Music playback',
     ),
   );
