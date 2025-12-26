@@ -1,7 +1,7 @@
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:audio_service/audio_service.dart';
-import 'music_metadata.dart';
+import '../data/models/music_metadata.dart';
 import 'music_service.dart';
 
 abstract class IPlayerManager {

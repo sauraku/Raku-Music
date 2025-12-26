@@ -6,10 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:audiotags/audiotags.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
-import 'app_config.dart';
-import 'music_metadata.dart';
+import '../app/app_config.dart';
+import '../data/models/music_metadata.dart';
 import 'worker_service.dart';
-import 'metadata_repository.dart';
+import '../data/repositories/metadata_repository.dart';
 
 abstract class IMusicService {
   Future<List<MusicMetadata>> loadMetadata();
@@ -37,20 +37,42 @@ class MusicService implements IMusicService {
   Future<void> scanFolders(List<String> folders) async {
     await _repository.init();
     
+    // Create a map of existing songs for quick lookup and preservation of metadata
     final existingSongs = _repository.getAllSongs();
-    final existingPaths = existingSongs.map((s) => s.filePath).toSet();
+    final Map<String, MusicMetadata> existingSongsMap = {
+      for (var song in existingSongs) song.filePath: song
+    };
+    
+    final Map<String, MusicMetadata> newSongsMap = {};
     
     for (String folderPath in folders) {
       final directory = Directory(folderPath);
       if (!await directory.exists()) continue;
 
-      await for (final entity in directory.list(recursive: true, followLinks: false)) {
-        if (entity is File && _isAudioFile(entity.path) && !existingPaths.contains(entity.path)) {
-          final metadata = await _extractMetadata(entity);
-          await _repository.addOrUpdateSong(metadata);
+      try {
+        await for (final entity in directory.list(recursive: true, followLinks: false)) {
+          if (entity is File && _isAudioFile(entity.path)) {
+            if (existingSongsMap.containsKey(entity.path)) {
+              // Keep existing song data (play count, likes, color, etc.)
+              newSongsMap[entity.path] = existingSongsMap[entity.path]!;
+            } else {
+              // New song found
+              final metadata = await _extractMetadata(entity);
+              newSongsMap[entity.path] = metadata;
+            }
+          }
         }
+      } catch (e) {
+        print("Error scanning directory $folderPath: $e");
       }
     }
+    
+    // Replace the repository content with the newly scanned set
+    // This implicitly removes songs that:
+    // 1. Are no longer on disk
+    // 2. Are in folders that are no longer in the 'folders' list
+    // 3. Are now ignored (e.g. start with .)
+    await _repository.saveAll(newSongsMap.values.toList());
   }
 
   @override
@@ -67,8 +89,11 @@ class MusicService implements IMusicService {
 
   @override
   Future<void> updateSongColor(MusicMetadata song, int colorValue) async {
-    song.color = colorValue;
-    await _repository.updateSong(song);
+    // Only update if the color has actually changed or is new
+    if (song.color != colorValue) {
+      song.color = colorValue;
+      await _repository.updateSong(song);
+    }
   }
 
   @override
@@ -124,6 +149,10 @@ class MusicService implements IMusicService {
   }
 
   bool _isAudioFile(String path) {
+    // Ignore hidden files (starting with .)
+    if (p.basename(path).startsWith('.')) {
+      return false;
+    }
     final ext = p.extension(path).toLowerCase();
     return ['.mp3', '.flac', '.m4a', '.wav', '.ogg'].contains(ext);
   }

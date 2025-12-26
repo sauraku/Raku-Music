@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
-import 'app_config.dart';
-import 'music_metadata.dart';
+import '../../app/app_config.dart';
+import '../models/music_metadata.dart';
 
 class MetadataRepository {
   static final MetadataRepository _instance = MetadataRepository._internal();
@@ -10,7 +10,8 @@ class MetadataRepository {
   MetadataRepository._internal();
 
   static const String _metadataFileName = 'settings.json';
-  List<MusicMetadata> _songs = [];
+  // Use a Map for O(1) access by filePath
+  Map<String, MusicMetadata> _songsMap = {};
   bool _isLoaded = false;
 
   Future<void> init() async {
@@ -22,28 +23,35 @@ class MetadataRepository {
   Future<void> _loadFromDisk() async {
     final file = await _getMetadataFile();
     if (!await file.exists()) {
-      _songs = [];
+      _songsMap = {};
       return;
     }
 
     try {
       final content = await file.readAsString();
       final Map<String, dynamic> json = jsonDecode(content);
-      final List<dynamic>? songsJson = json['songs'];
-      if (songsJson != null) {
-        _songs = songsJson.map((s) => MusicMetadata.fromJson(s)).toList();
+      final dynamic songsData = json['songs'];
+      
+      if (songsData is Map) {
+        _songsMap = {};
+        songsData.forEach((key, value) {
+          if (value is Map<String, dynamic>) {
+             _songsMap[key.toString()] = MusicMetadata.fromJson(value);
+          }
+        });
       } else {
-        _songs = [];
+        _songsMap = {};
       }
     } catch (e) {
       print('Error loading metadata: $e');
-      _songs = [];
+      _songsMap = {};
     }
   }
 
   Future<void> _saveToDisk() async {
     final file = await _getMetadataFile();
-    final jsonList = _songs.map((m) => m.toJson()).toList();
+    // Save as a Map for O(1) lookup structure in JSON
+    final songsJsonMap = _songsMap.map((key, value) => MapEntry(key, value.toJson()));
     
     Map<String, dynamic> currentSettings = {};
     if (await file.exists()) {
@@ -51,7 +59,7 @@ class MetadataRepository {
         currentSettings = jsonDecode(await file.readAsString());
       } catch (e) { /* ignore */ }
     }
-    currentSettings['songs'] = jsonList;
+    currentSettings['songs'] = songsJsonMap;
     await file.writeAsString(jsonEncode(currentSettings));
   }
 
@@ -63,42 +71,35 @@ class MetadataRepository {
   // --- Public API ---
 
   List<MusicMetadata> getAllSongs() {
-    return List.unmodifiable(_songs);
+    return _songsMap.values.toList();
   }
 
   MusicMetadata? getSong(String filePath) {
-    try {
-      return _songs.firstWhere((s) => s.filePath == filePath);
-    } catch (e) {
-      return null;
-    }
+    return _songsMap[filePath];
   }
 
   Future<void> addOrUpdateSong(MusicMetadata song) async {
-    final index = _songs.indexWhere((s) => s.filePath == song.filePath);
-    if (index != -1) {
+    if (_songsMap.containsKey(song.filePath)) {
       // Preserve existing user data if scanning
-      final existing = _songs[index];
+      final existing = _songsMap[song.filePath]!;
       song.playCount = existing.playCount;
       song.isLiked = existing.isLiked;
       song.color = existing.color;
-      _songs[index] = song;
-    } else {
-      _songs.add(song);
     }
+    _songsMap[song.filePath] = song;
     await _saveToDisk();
   }
 
   Future<void> updateSong(MusicMetadata song) async {
-    final index = _songs.indexWhere((s) => s.filePath == song.filePath);
-    if (index != -1) {
-      _songs[index] = song;
-      await _saveToDisk();
+    if (_songsMap.containsKey(song.filePath)) {
+      _songsMap[song.filePath] = song;
+      // Don't await saveToDisk for UI responsiveness, fire and forget
+      _saveToDisk();
     }
   }
 
   Future<void> saveAll(List<MusicMetadata> songs) async {
-    _songs = songs;
+    _songsMap = {for (var song in songs) song.filePath: song};
     await _saveToDisk();
   }
 }

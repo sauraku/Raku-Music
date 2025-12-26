@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import 'music_metadata.dart';
-import 'player_manager.dart';
+import '../../data/models/music_metadata.dart';
+import '../../services/player_manager.dart';
 
 class SongListView extends StatelessWidget {
   final List<MusicMetadata> songs;

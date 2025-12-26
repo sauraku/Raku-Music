@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:audiotags/audiotags.dart';
 import 'package:image/image.dart' as img;
 import 'package:palette_generator/palette_generator.dart';
@@ -110,21 +111,41 @@ List<double> _processPcmData(Uint8List pcmBytes, int targetSamples) {
 
   final samplesPerBar = totalSamples / targetSamples;
   final waveform = <double>[];
-
+  
+  // First pass: collect RMS values instead of Peak
+  // RMS (Root Mean Square) gives a better representation of loudness/energy
+  // and avoids the "brick wall" look of compressed audio where peaks are always maxed.
+  double globalMax = 0;
   for (int i = 0; i < targetSamples; i++) {
-    double maxSample = 0;
+    double sumSquares = 0;
+    int count = 0;
+    
     final int start = (i * samplesPerBar).floor();
     final int end = ((i + 1) * samplesPerBar).floor();
 
     for (int j = start; j < end; j++) {
       if (j * 2 + 2 <= pcmBytes.lengthInBytes) {
-        final sample = byteData.getInt16(j * 2, Endian.little).abs();
-        if (sample > maxSample) maxSample = sample.toDouble();
+        final sample = byteData.getInt16(j * 2, Endian.little);
+        sumSquares += sample * sample;
+        count++;
       }
     }
-    waveform.add(maxSample / 32768.0);
+    
+    final double rms = count > 0 ? sqrt(sumSquares / count) : 0.0;
+    waveform.add(rms);
+    if (rms > globalMax) globalMax = rms;
   }
-  return waveform;
+
+  // Second pass: normalize relative to the song's max RMS
+  // Use a minimum threshold to avoid amplifying silence too much
+  final double normalizationFactor = globalMax > 100 ? globalMax : 32768.0;
+  
+  return waveform.map((sample) {
+    double normalized = sample / normalizationFactor;
+    // Use linear scaling (no power function) to preserve the natural dynamic range
+    // This prevents the "maxed out" look by allowing quieter parts to actually look quieter
+    return normalized;
+  }).toList();
 }
 
 // --- Service to manage the isolate from the main UI thread ---

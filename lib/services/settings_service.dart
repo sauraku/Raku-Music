@@ -2,13 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'app_config.dart';
+import '../app/app_config.dart';
 
 abstract class ISettingsService {
   Future<List<String>> loadMusicFolders();
   Future<void> saveMusicFolders(List<String> folders);
   Future<ThemeMode> loadThemeMode();
   Future<void> saveThemeMode(ThemeMode mode);
+  Future<Color> loadSeedColor();
+  Future<void> saveSeedColor(Color color);
   Future<Rect?> loadWindowBounds();
   Future<void> saveWindowBounds(Rect bounds);
 }
@@ -87,6 +89,23 @@ class SettingsService implements ISettingsService {
         break;
     }
     settings['theme_mode'] = themeName;
+    await _saveSettings(settings);
+  }
+
+  @override
+  Future<Color> loadSeedColor() async {
+    final settings = await _loadSettings();
+    final int? colorValue = settings['seed_color'];
+    if (colorValue != null) {
+      return Color(colorValue);
+    }
+    return Colors.deepPurple; // Default seed color
+  }
+
+  @override
+  Future<void> saveSeedColor(Color color) async {
+    final settings = await _loadSettings();
+    settings['seed_color'] = color.value;
     await _saveSettings(settings);
   }
 

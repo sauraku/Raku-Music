@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:window_manager/window_manager.dart';
 import 'dart:io';
 import 'dart:async';
-import 'player_manager.dart';
-import 'music_service.dart';
-import 'music_metadata.dart';
-import 'waveform_progress_bar.dart';
+import '../../services/player_manager.dart';
+import '../../services/music_service.dart';
+import '../../data/models/music_metadata.dart';
+import '../components/waveform_progress_bar.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   final Animation<double>? animation;
@@ -24,6 +25,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   final PlayerManager _playerManager = PlayerManager();
   final MusicService _musicService = MusicService();
   Color? _backgroundColor;
+  Color? _accentColor;
   Future<List<double>?>? _waveformFuture;
   Future<File?>? _artFuture;
   bool _isAnimationCompleted = false;
@@ -87,9 +89,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     // 1. Use cached color if available
     if (song.color != null) {
       if (mounted) {
-        setState(() {
-          _backgroundColor = Color(song.color!);
-        });
+        final color = Color(song.color!);
+        _setColorsFromPalette(color);
       }
       return;
     }
@@ -103,17 +104,38 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       );
       final color = palette.dominantColor?.color;
       if (color != null && mounted) {
-        setState(() {
-          _backgroundColor = color;
-        });
+        _setColorsFromPalette(color);
         // Save the color for future use
         await _musicService.updateSongColor(song, color.value);
       }
     } else if (mounted) {
       setState(() {
         _backgroundColor = null;
+        _accentColor = null;
       });
     }
+  }
+
+  void _setColorsFromPalette(Color color) {
+    final isDark = color.computeLuminance() < 0.4;
+    setState(() {
+      _backgroundColor = color;
+      _accentColor = isDark ? _lighten(color, 0.4) : _darken(color, 0.4);
+    });
+  }
+
+  Color _darken(Color color, [double amount = .1]) {
+    assert(amount >= 0 && amount <= 1);
+    final hsl = HSLColor.fromColor(color);
+    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
+    return hslDark.toColor();
+  }
+
+  Color _lighten(Color color, [double amount = .1]) {
+    assert(amount >= 0 && amount <= 1);
+    final hsl = HSLColor.fromColor(color);
+    final hslLight = hsl.withLightness((hsl.lightness + amount).clamp(0.0, 1.0));
+    return hslLight.toColor();
   }
 
   Future<void> _toggleLike(MusicMetadata song) async {
@@ -141,20 +163,27 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = _accentColor ?? Theme.of(context).colorScheme.primary;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500),
       color: _backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down),
-            onPressed: () => Navigator.of(context).pop(),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: DragToMoveArea(
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: const Text('Now Playing'),
+              centerTitle: true,
+            ),
           ),
-          title: const Text('Now Playing'),
-          centerTitle: true,
         ),
         body: SizedBox(
           width: double.infinity,
@@ -249,6 +278,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                             progress: positionSnapshot.data ?? Duration.zero,
                                             total: durationSnapshot.data ?? Duration.zero,
                                             onSeek: _playerManager.seek,
+                                            color: accentColor,
                                           );
                                         },
                                       );
@@ -271,7 +301,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                               value: progress,
                                               backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                                               valueColor: AlwaysStoppedAnimation<Color>(
-                                                Theme.of(context).colorScheme.primary,
+                                                accentColor,
                                               ),
                                             ),
                                           );
@@ -317,13 +347,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             } else if (playing != true) {
                               return IconButton(
                                 icon: const Icon(Icons.play_circle_fill, size: 64),
-                                color: Theme.of(context).colorScheme.primary,
+                                color: accentColor,
                                 onPressed: _playerManager.play,
                               );
                             } else {
                               return IconButton(
                                 icon: const Icon(Icons.pause_circle_filled, size: 64),
-                                color: Theme.of(context).colorScheme.primary,
+                                color: accentColor,
                                 onPressed: _playerManager.pause,
                               );
                             }
@@ -346,11 +376,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 break;
                               case LoopMode.all:
                                 icon = Icons.repeat;
-                                color = Theme.of(context).colorScheme.primary;
+                                color = accentColor;
                                 break;
                               case LoopMode.one:
                                 icon = Icons.repeat_one;
-                                color = Theme.of(context).colorScheme.primary;
+                                color = accentColor;
                                 break;
                             }
                             return IconButton(

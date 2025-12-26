@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'music_service.dart';
-import 'settings_service.dart';
-import 'main.dart';
+import '../../services/music_service.dart';
+import '../../services/settings_service.dart';
+import '../../main.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -202,6 +202,34 @@ class ThemeSettingsPanel extends StatefulWidget {
 class _ThemeSettingsPanelState extends State<ThemeSettingsPanel> {
   final SettingsService _settingsService = SettingsService();
   ThemeMode _currentThemeMode = ThemeMode.system;
+  Color _currentSeedColor = Colors.deepPurple;
+
+  final List<Color> _availableColors = [
+    Colors.deepPurple,
+    Colors.indigo,
+    Colors.blue,
+    Colors.lightBlue,
+    Colors.cyan,
+    Colors.teal,
+    Colors.green,
+    Colors.lightGreen,
+    Colors.lime,
+    Colors.yellow,
+    Colors.amber,
+    Colors.orange,
+    Colors.deepOrange,
+    Colors.red,
+    Colors.pink,
+    Colors.purple,
+    Colors.brown,
+    Colors.grey,
+    Colors.blueGrey,
+    const Color(0xFF1A237E), // Dark Indigo
+    const Color(0xFF004D40), // Dark Teal
+    const Color(0xFFB71C1C), // Dark Red
+    const Color(0xFF3E2723), // Dark Brown
+    const Color(0xFF212121), // Dark Grey
+  ];
 
   @override
   void initState() {
@@ -211,9 +239,11 @@ class _ThemeSettingsPanelState extends State<ThemeSettingsPanel> {
 
   Future<void> _loadTheme() async {
     final mode = await _settingsService.loadThemeMode();
+    final color = await _settingsService.loadSeedColor();
     if (mounted) {
       setState(() {
         _currentThemeMode = mode;
+        _currentSeedColor = color;
       });
     }
   }
@@ -223,36 +253,104 @@ class _ThemeSettingsPanelState extends State<ThemeSettingsPanel> {
       setState(() {
         _currentThemeMode = mode;
       });
-      // Update the global app state
       RakuMusicApp.of(context).changeTheme(mode);
     }
+  }
+
+  void _updateSeedColor(Color color) {
+    setState(() {
+      _currentSeedColor = color;
+    });
+    RakuMusicApp.of(context).changeSeedColor(color);
   }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.all(16.0),
       children: [
-        const ListTile(
-          title: Text('App Theme', style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(
+          'App Theme',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        RadioListTile<ThemeMode>(
-          title: const Text('System Default'),
-          value: ThemeMode.system,
-          groupValue: _currentThemeMode,
-          onChanged: _updateTheme,
+        const SizedBox(height: 8),
+        Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Column(
+            children: [
+              RadioListTile<ThemeMode>(
+                title: const Text('System Default'),
+                value: ThemeMode.system,
+                groupValue: _currentThemeMode,
+                onChanged: _updateTheme,
+              ),
+              RadioListTile<ThemeMode>(
+                title: const Text('Light'),
+                value: ThemeMode.light,
+                groupValue: _currentThemeMode,
+                onChanged: _updateTheme,
+              ),
+              RadioListTile<ThemeMode>(
+                title: const Text('Dark'),
+                value: ThemeMode.dark,
+                groupValue: _currentThemeMode,
+                onChanged: _updateTheme,
+              ),
+            ],
+          ),
         ),
-        RadioListTile<ThemeMode>(
-          title: const Text('Light'),
-          value: ThemeMode.light,
-          groupValue: _currentThemeMode,
-          onChanged: _updateTheme,
+        const SizedBox(height: 24),
+        Text(
+          'Accent Color',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        RadioListTile<ThemeMode>(
-          title: const Text('Dark'),
-          value: ThemeMode.dark,
-          groupValue: _currentThemeMode,
-          onChanged: _updateTheme,
+        const SizedBox(height: 8),
+        Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: _availableColors.map((color) {
+                return GestureDetector(
+                  onTap: () => _updateSeedColor(color),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: _currentSeedColor.value == color.value
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              width: 3,
+                            )
+                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: _currentSeedColor.value == color.value
+                        ? const Icon(Icons.check, color: Colors.white)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ],
     );

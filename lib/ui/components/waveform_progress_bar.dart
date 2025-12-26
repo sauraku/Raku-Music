@@ -8,6 +8,7 @@ class WaveformProgressBar extends StatefulWidget {
   final Function(Duration) onSeek;
   final double barWidth;
   final double barGap;
+  final Color? color;
 
   const WaveformProgressBar({
     super.key,
@@ -17,6 +18,7 @@ class WaveformProgressBar extends StatefulWidget {
     required this.onSeek,
     this.barWidth = 3.0,
     this.barGap = 2.0,
+    this.color,
   });
 
   @override
@@ -55,8 +57,8 @@ class _WaveformProgressBarState extends State<WaveformProgressBar> {
           progress: progressPercent,
           barWidth: widget.barWidth,
           barGap: widget.barGap,
-          playedColor: Theme.of(context).colorScheme.primary,
-          unplayedColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+          playedColor: widget.color ?? Theme.of(context).colorScheme.primary,
+          unplayedColor: (widget.color ?? Theme.of(context).colorScheme.onSurface).withOpacity(0.3),
         ),
       ),
     );
@@ -138,6 +140,8 @@ class WaveformPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant WaveformPainter oldDelegate) {
     return progress != oldDelegate.progress ||
-           waveformData != oldDelegate.waveformData;
+           waveformData != oldDelegate.waveformData ||
+           playedColor != oldDelegate.playedColor ||
+           unplayedColor != oldDelegate.unplayedColor;
   }
 }

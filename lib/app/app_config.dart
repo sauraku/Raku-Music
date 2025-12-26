@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -16,7 +17,12 @@ class AppConfig {
     if (Platform.isLinux) {
       final String? home = Platform.environment['HOME'];
       if (home != null) {
-        final Directory localDir = Directory(p.join(home, '.local', 'share', 'raku_music'));
+        // Segregate dev and prod environments
+        // kDebugMode is true when running with 'flutter run'
+        // kReleaseMode is true when running the installed app (built with --release)
+        final String appName = kDebugMode ? 'raku_music_dev' : 'raku_music';
+        
+        final Directory localDir = Directory(p.join(home, '.local', 'share', appName));
         if (!await localDir.exists()) {
           await localDir.create(recursive: true);
         }

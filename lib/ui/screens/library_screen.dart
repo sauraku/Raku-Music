@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'music_metadata.dart';
-import 'music_service.dart';
-import 'player_manager.dart';
-import 'song_list_view.dart';
+import '../../data/models/music_metadata.dart';
+import '../../services/music_service.dart';
+import '../../services/player_manager.dart';
+import '../components/song_list_view.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});

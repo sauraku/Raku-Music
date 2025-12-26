@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'player_manager.dart';
-import 'music_metadata.dart';
-import 'now_playing_screen.dart';
+import '../../services/player_manager.dart';
+import '../../data/models/music_metadata.dart';
+import '../screens/now_playing_screen.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -21,11 +21,14 @@ class MiniPlayer extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(
               PageRouteBuilder(
+                opaque: false, // Keep the background route built and ready
+                transitionDuration: const Duration(milliseconds: 250),
+                reverseTransitionDuration: const Duration(milliseconds: 200),
                 pageBuilder: (context, animation, secondaryAnimation) => NowPlayingScreen(animation: animation),
                 transitionsBuilder: (context, animation, secondaryAnimation, child) {
                   const begin = Offset(0.0, 1.0);
                   const end = Offset.zero;
-                  const curve = Curves.ease;
+                  const curve = Curves.easeInOut;
 
                   final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
                   final offsetAnimation = animation.drive(tween);
@@ -117,6 +120,10 @@ class MiniPlayer extends StatelessWidget {
                         ),
                       ),
                       // Controls
+                      IconButton(
+                        icon: const Icon(Icons.skip_previous),
+                        onPressed: playerManager.previous,
+                      ),
                       StreamBuilder<PlayerState>(
                         stream: playerManager.playerStateStream,
                         builder: (context, snapshot) {
