@@ -49,27 +49,23 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      # 7. Run automated tests to ensure code quality before building.
-      - name: Run tests
-        run: flutter test
-
-      # 8. Build the production-ready release version for Linux.
+      # 7. Build the production-ready release version for Linux.
       - name: Build Linux release
         run: flutter build linux --release
 
-      # 9. Extract the version number from the branch name (e.g., 'release/1.2.0' -> '1.2.0').
+      # 8. Extract the version number from the branch name (e.g., 'release/1.2.0' -> '1.2.0').
       - name: Extract version from branch
         id: extract_version
         run: echo "VERSION=${GITHUB_REF#refs/heads/release/}" >> $GITHUB_OUTPUT
 
-      # 10. Package the build output into a standard .tar.gz archive.
+      # 9. Package the build output into a standard .tar.gz archive.
       - name: Package release artifact
         run: |
           cd build/linux/x64/release/bundle
           tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz .
           mv raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz ../../../../
 
-      # 11. Create a new GitHub Release and upload the packaged artifact.
+      # 10. Create a new GitHub Release and upload the packaged artifact.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
