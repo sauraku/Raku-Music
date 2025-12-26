@@ -4,6 +4,9 @@
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
+#include <linux/limits.h>
+#include <unistd.h>
+#include <libgen.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -21,6 +24,13 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
+  // Look for an existing window.
+  GList* windows = gtk_application_get_windows(GTK_APPLICATION(application));
+  if (windows) {
+    gtk_window_present(GTK_WINDOW(windows->data));
+    return;
+  }
+
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
@@ -45,11 +55,48 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "raku_music");
+    gtk_header_bar_set_title(header_bar, "Raku Music");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "raku_music");
+    gtk_window_set_title(window, "Raku Music");
+  }
+
+  // Robustly resolve the icon path relative to the executable
+  char exe_path[PATH_MAX];
+  ssize_t count = readlink("/proc/self/exe", exe_path, PATH_MAX);
+  GdkPixbuf *icon = NULL;
+  GError *error = NULL;
+
+  if (count != -1) {
+    exe_path[count] = '\0';
+    char *dir = dirname(exe_path);
+    char icon_path[PATH_MAX];
+
+    // Try bundled asset path
+    snprintf(icon_path, PATH_MAX, "%s/data/flutter_assets/assets/app.png", dir);
+    icon = gdk_pixbuf_new_from_file(icon_path, &error);
+
+    if (!icon) {
+        // Clear error and try development path (assuming running from project root)
+        if (error) { g_error_free(error); error = NULL; }
+
+        // Try simple relative path
+        icon = gdk_pixbuf_new_from_file("assets/app.png", &error);
+    }
+  } else {
+      // Fallback if readlink fails
+      icon = gdk_pixbuf_new_from_file("assets/app.png", &error);
+  }
+
+  if (icon) {
+    gtk_window_set_icon(window, icon);
+    g_object_unref(icon);
+  } else {
+    if (error) {
+        g_warning("Failed to load icon: %s", error->message);
+        g_error_free(error);
+    }
   }
 
   gtk_window_set_default_size(window, 1280, 720);
@@ -144,5 +191,5 @@ MyApplication* my_application_new() {
 
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_NON_UNIQUE, nullptr));
+                                     G_APPLICATION_HANDLES_OPEN, nullptr));
 }

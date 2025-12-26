@@ -9,6 +9,8 @@ abstract class ISettingsService {
   Future<void> saveMusicFolders(List<String> folders);
   Future<ThemeMode> loadThemeMode();
   Future<void> saveThemeMode(ThemeMode mode);
+  Future<Rect?> loadWindowBounds();
+  Future<void> saveWindowBounds(Rect bounds);
 }
 
 class SettingsService implements ISettingsService {
@@ -85,6 +87,33 @@ class SettingsService implements ISettingsService {
         break;
     }
     settings['theme_mode'] = themeName;
+    await _saveSettings(settings);
+  }
+
+  @override
+  Future<Rect?> loadWindowBounds() async {
+    final settings = await _loadSettings();
+    if (settings['window_bounds'] != null) {
+      final bounds = settings['window_bounds'];
+      return Rect.fromLTWH(
+        bounds['left'],
+        bounds['top'],
+        bounds['width'],
+        bounds['height'],
+      );
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveWindowBounds(Rect bounds) async {
+    final settings = await _loadSettings();
+    settings['window_bounds'] = {
+      'left': bounds.left,
+      'top': bounds.top,
+      'width': bounds.width,
+      'height': bounds.height,
+    };
     await _saveSettings(settings);
   }
 }

@@ -17,39 +17,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: Row(
-        children: [
-          // Left Panel: Navigation
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (int index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.library_music),
-                label: Text('Library'),
+      body: NestedScrollView(
+        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+          return <Widget>[
+            SliverAppBar(
+              expandedHeight: 120.0,
+              floating: false,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                title: Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.brightness_6),
-                label: Text('Theme'),
-              ),
-            ],
-          ),
-          const VerticalDivider(thickness: 1, width: 1),
-          // Right Panel: Content
-          Expanded(
-            child: _selectedIndex == 0
-                ? const LibrarySettingsPanel()
-                : const ThemeSettingsPanel(),
-          ),
-        ],
+            ),
+          ];
+        },
+        body: Row(
+          children: [
+            // Left Panel: Navigation
+            NavigationRail(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (int index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.library_music),
+                  label: Text('Library'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.brightness_6),
+                  label: Text('Theme'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            // Right Panel: Content
+            Expanded(
+              child: _selectedIndex == 0
+                  ? const LibrarySettingsPanel()
+                  : const ThemeSettingsPanel(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -134,6 +152,7 @@ class _LibrarySettingsPanelState extends State<LibrarySettingsPanel> {
         if (_isScanning) const LinearProgressIndicator(),
         Expanded(
           child: ListView(
+            padding: EdgeInsets.zero,
             children: [
               ListTile(
                 title: const Text('Music Folders', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -212,6 +231,7 @@ class _ThemeSettingsPanelState extends State<ThemeSettingsPanel> {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      padding: EdgeInsets.zero,
       children: [
         const ListTile(
           title: Text('App Theme', style: TextStyle(fontWeight: FontWeight.bold)),

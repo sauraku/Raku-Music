@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'music_metadata.dart';
 import 'music_service.dart';
 import 'player_manager.dart';
+import 'song_list_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -61,6 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _toggleLike(MusicMetadata song) async {
+    await _musicService.toggleLike(song);
+    // Refresh the list to show updated state
+    await _loadSongs();
+  }
+
   void _toggleSearch() {
     setState(() {
       _isSearching = !_isSearching;
@@ -74,79 +81,69 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search songs...',
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(color: Colors.black),
-              )
-            : const Text('Library'),
-        actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: _toggleSearch,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _filteredSongs.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.music_note, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        _allSongs.isEmpty ? 'No music found' : 'No results found',
-                        style: Theme.of(context).textTheme.titleLarge,
+      body: NestedScrollView(
+        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+          return <Widget>[
+            SliverAppBar(
+              expandedHeight: 120.0,
+              floating: false,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                title: _isSearching
+                    ? TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: 'Search songs...',
+                          border: InputBorder.none,
+                        ),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 20,
+                        ),
+                      )
+                    : Text(
+                        'Library',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      if (_allSongs.isEmpty) ...[
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(_isSearching ? Icons.close : Icons.search),
+                  onPressed: _toggleSearch,
+                ),
+              ],
+            ),
+          ];
+        },
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _filteredSongs.isEmpty && !_isSearching && _allSongs.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.music_note, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No music found',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 8),
                         const Text('Go to Settings to add music folders'),
                       ],
-                    ],
+                    ),
+                  )
+                : SongListView(
+                    songs: _filteredSongs,
+                    onToggleLike: _toggleLike,
+                    playerManager: _playerManager,
                   ),
-                )
-              : ListView.builder(
-                  itemCount: _filteredSongs.length,
-                  itemBuilder: (context, index) {
-                    final song = _filteredSongs[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                        child: const Icon(Icons.music_note),
-                      ),
-                      title: Text(
-                        song.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        '${song.artist} • ${song.album}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(
-                          song.isLiked ? Icons.favorite : Icons.favorite_border,
-                          color: song.isLiked ? Colors.red : null,
-                        ),
-                        onPressed: () {
-                          // TODO: Implement like functionality
-                        },
-                      ),
-                      onTap: () {
-                        _playerManager.playSong(song, _filteredSongs);
-                      },
-                    );
-                  },
-                ),
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:audio_service/audio_service.dart';
 import 'music_metadata.dart';
+import 'music_service.dart';
 
 abstract class IPlayerManager {
   Stream<PlayerState> get playerStateStream;
@@ -18,12 +20,12 @@ abstract class IPlayerManager {
   void dispose();
 }
 
-class PlayerManager implements IPlayerManager {
+class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   static final PlayerManager _instance = PlayerManager._internal();
   factory PlayerManager() => _instance;
-  PlayerManager._internal();
 
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final MusicService _musicService = MusicService();
   
   // Streams
   @override
@@ -43,15 +45,86 @@ class PlayerManager implements IPlayerManager {
   // Playlist
   List<MusicMetadata> _playlist = [];
   int _currentIndex = -1;
+  bool _playCountIncrementedForCurrentSong = false;
+
+  PlayerManager._internal() {
+    // Listen for player state changes to detect when a song finishes
+    _audioPlayer.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        // The song finished naturally, auto-play next
+        next();
+      }
+      _updatePlaybackState(state);
+    });
+
+    // Listen for position changes to increment play count
+    _audioPlayer.positionStream.listen((position) {
+      _updatePlaybackState(_audioPlayer.playerState);
+      _checkAndIncrementPlayCount(position);
+    });
+  }
+
+  void _checkAndIncrementPlayCount(Duration position) {
+    final duration = _audioPlayer.duration;
+    if (duration == null || duration.inSeconds == 0) return;
+    if (_playCountIncrementedForCurrentSong) return;
+
+    final tenPercent = duration.inSeconds * 0.1;
+    if (position.inSeconds >= tenPercent) {
+      if (_currentSongSubject.value != null) {
+        _musicService.incrementPlayCount(_currentSongSubject.value!);
+        _playCountIncrementedForCurrentSong = true;
+      }
+    }
+  }
+
+  void _updatePlaybackState(PlayerState state) {
+    playbackState.add(playbackState.value.copyWith(
+      controls: [
+        MediaControl.skipToPrevious,
+        if (state.playing) MediaControl.pause else MediaControl.play,
+        MediaControl.skipToNext,
+      ],
+      systemActions: const {
+        MediaAction.seek,
+      },
+      androidCompactActionIndices: const [0, 1, 2],
+      processingState: const {
+        ProcessingState.idle: AudioProcessingState.idle,
+        ProcessingState.loading: AudioProcessingState.loading,
+        ProcessingState.buffering: AudioProcessingState.buffering,
+        ProcessingState.ready: AudioProcessingState.ready,
+        ProcessingState.completed: AudioProcessingState.completed,
+      }[state.processingState]!,
+      playing: state.playing,
+      updatePosition: _audioPlayer.position,
+      bufferedPosition: _audioPlayer.bufferedPosition,
+      speed: _audioPlayer.speed,
+      queueIndex: _currentIndex,
+    ));
+  }
+
+  void _updateMediaItem(MusicMetadata song) {
+    mediaItem.add(MediaItem(
+      id: song.filePath,
+      album: song.album,
+      title: song.title,
+      artist: song.artist,
+      duration: _audioPlayer.duration,
+      artUri: null, // Add album art URI if available
+    ));
+  }
 
   @override
   Future<void> playSong(MusicMetadata song, List<MusicMetadata> playlist) async {
     _playlist = playlist;
     _currentIndex = playlist.indexOf(song);
     _currentSongSubject.add(song);
+    _playCountIncrementedForCurrentSong = false; // Reset for new song
     
     try {
       await _audioPlayer.setFilePath(song.filePath);
+      _updateMediaItem(song);
       await _audioPlayer.play();
     } catch (e) {
       print("Error playing song: $e");
@@ -88,6 +161,12 @@ class PlayerManager implements IPlayerManager {
       await playSong(_playlist[_currentIndex], _playlist);
     }
   }
+  
+  @override
+  Future<void> skipToNext() => next();
+
+  @override
+  Future<void> skipToPrevious() => previous();
 
   @override
   void dispose() {

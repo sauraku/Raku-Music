@@ -9,6 +9,8 @@ abstract class IMusicService {
   Future<List<MusicMetadata>> loadMetadata();
   Future<void> saveMetadata(List<MusicMetadata> metadataList);
   Future<void> scanFolders(List<String> folders);
+  Future<void> toggleLike(MusicMetadata song);
+  Future<void> incrementPlayCount(MusicMetadata song);
 }
 
 class MusicService implements IMusicService {
@@ -69,6 +71,28 @@ class MusicService implements IMusicService {
 
     if (hasChanges) {
       await saveMetadata(metadataMap.values.toList());
+    }
+  }
+
+  @override
+  Future<void> toggleLike(MusicMetadata song) async {
+    List<MusicMetadata> allSongs = await loadMetadata();
+    final index = allSongs.indexWhere((s) => s.filePath == song.filePath);
+    
+    if (index != -1) {
+      allSongs[index].isLiked = !allSongs[index].isLiked;
+      await saveMetadata(allSongs);
+    }
+  }
+
+  @override
+  Future<void> incrementPlayCount(MusicMetadata song) async {
+    List<MusicMetadata> allSongs = await loadMetadata();
+    final index = allSongs.indexWhere((s) => s.filePath == song.filePath);
+    
+    if (index != -1) {
+      allSongs[index].playCount++;
+      await saveMetadata(allSongs);
     }
   }
 
