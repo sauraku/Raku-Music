@@ -20,7 +20,14 @@ This project is designed for Linux.
 
 - Flutter SDK
 - Linux development tools (e.g., `clang`, `cmake`, `ninja-build`, `pkg-config`, `libgtk-3-dev`)
-- `mpv` (required for audio playback backend)
+- **ffmpeg**: Required for waveform generation.
+  - For Arch/Manjaro: `sudo pacman -S ffmpeg`
+  - For Debian/Ubuntu: `sudo apt install ffmpeg`
+  - For Fedora: `sudo dnf install ffmpeg`
+- **libayatana-appindicator**: Required for the system tray icon.
+  - For Arch/Manjaro: `sudo pacman -S libayatana-appindicator`
+  - For Debian/Ubuntu: `sudo apt install libayatana-appindicator3-dev`
+  - For Fedora: `sudo dnf install libappindicator-gtk3-devel`
 
 ### Installation
 

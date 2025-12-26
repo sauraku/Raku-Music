@@ -37,7 +37,7 @@ void main() async {
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
-    title: 'Raku Music',
+    title: 'Raku Music Dev',
   );
   
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -132,7 +132,7 @@ class _RakuMusicAppState extends State<RakuMusicApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Raku Music',
+      title: 'Raku Music Dev',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(

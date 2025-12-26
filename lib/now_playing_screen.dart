@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
+import 'dart:io';
 import 'player_manager.dart';
+import 'music_service.dart';
 import 'music_metadata.dart';
+import 'waveform_progress_bar.dart';
 
 class NowPlayingScreen extends StatelessWidget {
   const NowPlayingScreen({super.key});
@@ -10,6 +12,7 @@ class NowPlayingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playerManager = PlayerManager();
+    final musicService = MusicService();
 
     return Scaffold(
       appBar: AppBar(
@@ -37,19 +40,33 @@ class NowPlayingScreen extends StatelessWidget {
                   Expanded(
                     child: AspectRatio(
                       aspectRatio: 1,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                      child: FutureBuilder<File?>(
+                        future: musicService.getAlbumArt(song),
+                        builder: (context, artSnapshot) {
+                          final artFile = artSnapshot.data;
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                              image: artFile != null
+                                  ? DecorationImage(
+                                      image: FileImage(artFile),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                          ],
-                        ),
-                        child: const Icon(Icons.music_note, size: 120),
+                            child: artFile == null
+                                ? const Icon(Icons.music_note, size: 120)
+                                : null,
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -75,23 +92,29 @@ class NowPlayingScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 32),
-                  // Progress Bar
-                  StreamBuilder<Duration>(
-                    stream: playerManager.positionStream,
-                    builder: (context, snapshot) {
-                      final position = snapshot.data ?? Duration.zero;
-                      return StreamBuilder<Duration?>(
-                        stream: playerManager.durationStream,
-                        builder: (context, snapshot) {
-                          final duration = snapshot.data ?? Duration.zero;
-                          return ProgressBar(
-                            progress: position,
-                            total: duration,
-                            onSeek: playerManager.seek,
-                            baseBarColor: Theme.of(context).colorScheme.surfaceVariant,
-                            progressBarColor: Theme.of(context).colorScheme.primary,
-                            thumbColor: Theme.of(context).colorScheme.primary,
-                            timeLabelLocation: TimeLabelLocation.sides,
+                  // Waveform Progress Bar
+                  FutureBuilder<List<double>?>(
+                    future: musicService.getWaveform(song),
+                    builder: (context, waveformSnapshot) {
+                      final waveformData = waveformSnapshot.data;
+                      if (waveformData == null || waveformData.isEmpty) {
+                        return const SizedBox(height: 100, child: Center(child: Text("Generating waveform...")));
+                      }
+                      return StreamBuilder<Duration>(
+                        stream: playerManager.positionStream,
+                        builder: (context, positionSnapshot) {
+                          final position = positionSnapshot.data ?? Duration.zero;
+                          return StreamBuilder<Duration?>(
+                            stream: playerManager.durationStream,
+                            builder: (context, durationSnapshot) {
+                              final duration = durationSnapshot.data ?? Duration.zero;
+                              return WaveformProgressBar(
+                                waveformData: waveformData,
+                                progress: position,
+                                total: duration,
+                                onSeek: playerManager.seek,
+                              );
+                            },
                           );
                         },
                       );

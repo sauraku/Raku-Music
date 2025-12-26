@@ -19,11 +19,23 @@ class MiniPlayer extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              useSafeArea: true,
-              builder: (context) => const NowPlayingScreen(),
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const NowPlayingScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(0.0, 1.0);
+                  const end = Offset.zero;
+                  const curve = Curves.ease;
+
+                  final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                  final offsetAnimation = animation.drive(tween);
+
+                  return SlideTransition(
+                    position: offsetAnimation,
+                    child: child,
+                  );
+                },
+              ),
             );
           },
           child: Container(
@@ -39,7 +51,7 @@ class MiniPlayer extends StatelessWidget {
             ),
             child: Column(
               children: [
-                // Progress Bar (Thin line at top)
+                // Simple Linear Progress Bar
                 StreamBuilder<Duration>(
                   stream: playerManager.positionStream,
                   builder: (context, snapshot) {
@@ -48,9 +60,12 @@ class MiniPlayer extends StatelessWidget {
                       stream: playerManager.durationStream,
                       builder: (context, snapshot) {
                         final duration = snapshot.data ?? Duration.zero;
-                        if (duration == Duration.zero) return const SizedBox(height: 2);
+                        double progress = 0.0;
+                        if (duration.inMilliseconds > 0) {
+                          progress = position.inMilliseconds / duration.inMilliseconds;
+                        }
                         return LinearProgressIndicator(
-                          value: position.inMilliseconds / duration.inMilliseconds,
+                          value: progress,
                           minHeight: 2,
                           backgroundColor: Colors.transparent,
                           valueColor: AlwaysStoppedAnimation<Color>(
