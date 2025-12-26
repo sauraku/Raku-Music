@@ -3,6 +3,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:audio_service/audio_service.dart';
 import '../data/models/music_metadata.dart';
 import 'music_service.dart';
+import 'settings_service.dart';
 
 abstract class IPlayerManager {
   Stream<PlayerState> get playerStateStream;
@@ -10,15 +11,18 @@ abstract class IPlayerManager {
   Stream<Duration?> get durationStream;
   Stream<MusicMetadata?> get currentSongStream;
   Stream<LoopMode> get loopModeStream;
+  Stream<double> get speedStream;
   MusicMetadata? get currentSong;
 
   Future<void> playSong(MusicMetadata song, List<MusicMetadata> playlist);
   Future<void> play();
   Future<void> pause();
+  Future<void> togglePlayPause();
   Future<void> seek(Duration position);
   Future<void> next();
   Future<void> previous();
   Future<void> setLoopMode(LoopMode loopMode);
+  Future<void> setSpeed(double speed);
   void dispose();
 }
 
@@ -28,6 +32,7 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   final MusicService _musicService = MusicService();
+  final SettingsService _settingsService = SettingsService();
   
   // Streams
   @override
@@ -38,6 +43,8 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
   @override
   Stream<LoopMode> get loopModeStream => _audioPlayer.loopModeStream;
+  @override
+  Stream<double> get speedStream => _audioPlayer.speedStream;
   
   // Current song
   final BehaviorSubject<MusicMetadata?> _currentSongSubject = BehaviorSubject<MusicMetadata?>.seeded(null);
@@ -52,6 +59,7 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   bool _playCountIncrementedForCurrentSong = false;
 
   PlayerManager._internal() {
+    _loadInitialSpeed();
     _audioPlayer.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         // Let just_audio handle looping, only auto-play next if not looping
@@ -66,6 +74,11 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
       _updatePlaybackState(_audioPlayer.playerState);
       _checkAndIncrementPlayCount(position);
     });
+  }
+
+  Future<void> _loadInitialSpeed() async {
+    final speed = await _settingsService.loadPlaybackSpeed();
+    await _audioPlayer.setSpeed(speed);
   }
 
   void _checkAndIncrementPlayCount(Duration position) {
@@ -91,6 +104,7 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
       ],
       systemActions: const {
         MediaAction.seek,
+        MediaAction.setSpeed,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
@@ -146,6 +160,15 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   }
 
   @override
+  Future<void> togglePlayPause() async {
+    if (_audioPlayer.playing) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play();
+    }
+  }
+
+  @override
   Future<void> seek(Duration position) async {
     await _audioPlayer.seek(position);
   }
@@ -178,6 +201,12 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   @override
   Future<void> setLoopMode(LoopMode loopMode) async {
     await _audioPlayer.setLoopMode(loopMode);
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    await _audioPlayer.setSpeed(speed);
+    await _settingsService.savePlaybackSpeed(speed);
   }
 
   @override

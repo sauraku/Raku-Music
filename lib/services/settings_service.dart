@@ -11,6 +11,8 @@ abstract class ISettingsService {
   Future<void> saveThemeMode(ThemeMode mode);
   Future<Color> loadSeedColor();
   Future<void> saveSeedColor(Color color);
+  Future<double> loadPlaybackSpeed();
+  Future<void> savePlaybackSpeed(double speed);
   Future<Rect?> loadWindowBounds();
   Future<void> saveWindowBounds(Rect bounds);
 }
@@ -106,6 +108,19 @@ class SettingsService implements ISettingsService {
   Future<void> saveSeedColor(Color color) async {
     final settings = await _loadSettings();
     settings['seed_color'] = color.value;
+    await _saveSettings(settings);
+  }
+
+  @override
+  Future<double> loadPlaybackSpeed() async {
+    final settings = await _loadSettings();
+    return (settings['playback_speed'] as num?)?.toDouble() ?? 1.0;
+  }
+
+  @override
+  Future<void> savePlaybackSpeed(double speed) async {
+    final settings = await _loadSettings();
+    settings['playback_speed'] = speed;
     await _saveSettings(settings);
   }
 

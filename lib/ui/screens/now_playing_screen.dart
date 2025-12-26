@@ -161,6 +161,45 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     _playerManager.setLoopMode(nextMode);
   }
 
+  void _showSpeedDialog(BuildContext context, Color accentColor) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Playback Speed'),
+          content: StreamBuilder<double>(
+            stream: _playerManager.speedStream,
+            builder: (context, snapshot) {
+              final speed = snapshot.data ?? 1.0;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${speed.toStringAsFixed(1)}x', style: Theme.of(context).textTheme.headlineMedium),
+                  Slider(
+                    value: speed,
+                    min: 0.5,
+                    max: 2.0,
+                    divisions: 15,
+                    activeColor: accentColor,
+                    onChanged: (value) {
+                      _playerManager.setSpeed(value);
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Close', style: TextStyle(color: accentColor)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accentColor = _accentColor ?? Theme.of(context).colorScheme.primary;
@@ -182,6 +221,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               ),
               title: const Text('Now Playing'),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.speed),
+                  onPressed: () => _showSpeedDialog(context, accentColor),
+                ),
+              ],
             ),
           ),
         ),
@@ -200,39 +245,42 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   children: [
                     // Album Art
                     Expanded(
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: FutureBuilder<File?>(
-                          future: _artFuture,
-                          builder: (context, artSnapshot) {
-                            final artFile = artSnapshot.data;
-                            return AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 500),
-                              child: Container(
-                                key: ValueKey(artFile?.path ?? 'placeholder'),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                  image: artFile != null
-                                      ? DecorationImage(
-                                          image: FileImage(artFile),
-                                          fit: BoxFit.cover,
-                                        )
+                      child: GestureDetector(
+                        onTap: () => _playerManager.togglePlayPause(),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: FutureBuilder<File?>(
+                            future: _artFuture,
+                            builder: (context, artSnapshot) {
+                              final artFile = artSnapshot.data;
+                              return AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 500),
+                                child: Container(
+                                  key: ValueKey(artFile?.path ?? 'placeholder'),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                    image: artFile != null
+                                        ? DecorationImage(
+                                            image: FileImage(artFile),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                  ),
+                                  child: artFile == null
+                                      ? const Icon(Icons.music_note, size: 120)
                                       : null,
                                 ),
-                                child: artFile == null
-                                    ? const Icon(Icons.music_note, size: 120)
-                                    : null,
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),

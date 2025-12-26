@@ -15,11 +15,76 @@ import 'package:path/path.dart' as p;
 
 late AudioHandler _audioHandler;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  JustAudioMediaKit.ensureInitialized();
-  await windowManager.ensureInitialized();
+Future<void> _initSystemTray() async {
+  print('DEBUG: Starting _initSystemTray');
+  final SystemTray systemTray = SystemTray();
+  final AppWindow appWindow = AppWindow();
 
+  String path = Platform.isWindows ? 'assets/app.ico' : 'assets/app.png';
+
+  if (Platform.isLinux) {
+    final String executableDir = p.dirname(Platform.resolvedExecutable);
+    final String assetsPath = p.join(executableDir, 'data', 'flutter_assets', 'assets', 'app.png');
+
+    if (await File(assetsPath).exists()) {
+      path = assetsPath;
+    } else {
+      final String projectRootAssets = p.join(Directory.current.path, 'assets', 'app.png');
+      if (await File(projectRootAssets).exists()) {
+        path = projectRootAssets;
+      }
+    }
+  }
+  print('DEBUG: System tray icon path: $path');
+
+  try {
+    print('DEBUG: Calling systemTray.initSystemTray');
+    await systemTray.initSystemTray(
+      title: "Raku Music",
+      iconPath: path,
+    );
+    print('DEBUG: systemTray.initSystemTray completed');
+
+    final Menu menu = Menu();
+    await menu.buildFrom([
+      MenuItemLabel(label: 'Show', onClicked: (menuItem) => appWindow.show()),
+      MenuItemLabel(label: 'Hide', onClicked: (menuItem) => appWindow.hide()),
+      MenuItemLabel(label: 'Exit', onClicked: (menuItem) => appWindow.close()),
+    ]);
+    print('DEBUG: Menu built');
+
+    await systemTray.setContextMenu(menu);
+    print('DEBUG: Context menu set');
+
+    systemTray.registerSystemTrayEventHandler((eventName) {
+      if (eventName == kSystemTrayEventClick) {
+        Platform.isWindows ? appWindow.show() : systemTray.popUpContextMenu();
+      } else if (eventName == kSystemTrayEventRightClick) {
+        Platform.isWindows ? systemTray.popUpContextMenu() : appWindow.show();
+      }
+    });
+    print('DEBUG: Event handler registered');
+  } catch (e, stack) {
+    print('DEBUG: Error in _initSystemTray: $e');
+    print(stack);
+  }
+}
+
+void main() async {
+  print('DEBUG: main() started');
+  WidgetsFlutterBinding.ensureInitialized();
+  print('DEBUG: WidgetsFlutterBinding initialized');
+  
+  JustAudioMediaKit.ensureInitialized();
+  print('DEBUG: JustAudioMediaKit initialized');
+  
+  await windowManager.ensureInitialized();
+  print('DEBUG: windowManager initialized');
+  
+  // await _initSystemTray(); // Initialize system tray before the app runs
+  print('DEBUG: _initSystemTray skipped for debugging');
+
+  print('DEBUG: Initializing AudioService');
   _audioHandler = await AudioService.init(
     builder: () => PlayerManager(),
     config: const AudioServiceConfig(
@@ -27,11 +92,13 @@ void main() async {
       androidNotificationChannelName: 'Music playback',
     ),
   );
+  print('DEBUG: AudioService initialized');
 
   final settingsService = SettingsService();
   final savedBounds = await settingsService.loadWindowBounds();
   final initialThemeMode = await settingsService.loadThemeMode();
   final initialSeedColor = await settingsService.loadSeedColor();
+  print('DEBUG: Settings loaded');
 
   WindowOptions windowOptions = WindowOptions(
     size: savedBounds?.size ?? const Size(800, 800),
@@ -42,6 +109,7 @@ void main() async {
     title: 'Raku Music Dev',
   );
   
+  print('DEBUG: Waiting for window to be ready');
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
     if (savedBounds != null) {
       await windowManager.setBounds(savedBounds);
@@ -49,11 +117,13 @@ void main() async {
     await windowManager.show();
     await windowManager.focus();
   });
+  print('DEBUG: Window shown');
 
   runApp(RakuMusicApp(
     initialThemeMode: initialThemeMode,
     initialSeedColor: initialSeedColor,
   ));
+  print('DEBUG: runApp called');
 }
 
 class RakuMusicApp extends StatefulWidget {
@@ -77,56 +147,13 @@ class _RakuMusicAppState extends State<RakuMusicApp> {
   late ThemeMode _themeMode;
   late Color _seedColor;
   final SettingsService _settingsService = SettingsService();
-  final SystemTray _systemTray = SystemTray();
-  final AppWindow _appWindow = AppWindow();
 
   @override
   void initState() {
     super.initState();
     _themeMode = widget.initialThemeMode;
     _seedColor = widget.initialSeedColor;
-    _initSystemTray();
     windowManager.setPreventClose(true);
-  }
-
-  Future<void> _initSystemTray() async {
-    String path = Platform.isWindows ? 'assets/app.ico' : 'assets/app.png';
-    
-    if (Platform.isLinux) {
-      final String executableDir = p.dirname(Platform.resolvedExecutable);
-      final String assetsPath = p.join(executableDir, 'data', 'flutter_assets', 'assets', 'app.png');
-      
-      if (await File(assetsPath).exists()) {
-        path = assetsPath;
-      } else {
-        final String projectRootAssets = p.join(Directory.current.path, 'assets', 'app.png');
-        if (await File(projectRootAssets).exists()) {
-          path = projectRootAssets;
-        }
-      }
-    }
-
-    await _systemTray.initSystemTray(
-      title: "Raku Music",
-      iconPath: path,
-    );
-
-    final Menu menu = Menu();
-    await menu.buildFrom([
-      MenuItemLabel(label: 'Show', onClicked: (menuItem) => _appWindow.show()),
-      MenuItemLabel(label: 'Hide', onClicked: (menuItem) => _appWindow.hide()),
-      MenuItemLabel(label: 'Exit', onClicked: (menuItem) => _appWindow.close()),
-    ]);
-
-    await _systemTray.setContextMenu(menu);
-
-    _systemTray.registerSystemTrayEventHandler((eventName) {
-      if (eventName == kSystemTrayEventClick) {
-        Platform.isWindows ? _appWindow.show() : _systemTray.popUpContextMenu();
-      } else if (eventName == kSystemTrayEventRightClick) {
-        Platform.isWindows ? _systemTray.popUpContextMenu() : _appWindow.show();
-      }
-    });
   }
 
   void changeTheme(ThemeMode mode) {

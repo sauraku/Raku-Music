@@ -34,18 +34,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onSearchChanged() {
-    final query = _searchController.text;
+    final query = _searchController.text.trim();
     if (query.length >= 3) {
       setState(() {
         _filteredSongs = _allSongs.where((song) {
           final titleLower = song.title.toLowerCase();
           final artistLower = song.artist.toLowerCase();
+          final albumLower = song.album.toLowerCase();
           final searchLower = query.toLowerCase();
-          return titleLower.contains(searchLower) || artistLower.contains(searchLower);
+          
+          return titleLower.contains(searchLower) || 
+                 artistLower.contains(searchLower) ||
+                 albumLower.contains(searchLower);
         }).toList();
       });
-    } else {
+    } else if (query.isEmpty) {
       setState(() {
+        _filteredSongs = List.from(_allSongs);
+      });
+    }
+    // If query length is 1 or 2, we don't update the list (keep previous state)
+    // or we could show empty/full list. Usually showing full list until 3 chars is better UX.
+    else {
+       setState(() {
         _filteredSongs = List.from(_allSongs);
       });
     }
