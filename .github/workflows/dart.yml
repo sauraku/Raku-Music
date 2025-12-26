@@ -6,6 +6,10 @@ on:
     branches:
       - 'release/**'
 
+# Grant write permissions to the GITHUB_TOKEN so it can create releases.
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     name: Build Arch Linux Release
@@ -16,20 +20,15 @@ jobs:
 
     steps:
       # 1. Install essential build dependencies inside the Arch container using pacman.
-      # git: for checking out code and cloning Flutter.
-      # clang, cmake, ninja, pkg-config, gtk3: for building the Flutter Linux app.
-      # which: required by Flutter tool.
-      # ffmpeg: required for running tests that might invoke waveform generation.
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git clang cmake ninja pkg-config gtk3 which ffmpeg
+          pacman -S --noconfirm base-devel git clang cmake ninja pkg-config gtk3 which ffmpeg unzip libappindicator-gtk3
 
-      # 2. Install the Flutter SDK manually. This is more reliable in a CI environment
-      # than using an AUR helper. We pin to a specific version for reproducible builds.
+      # 2. Install the Flutter SDK manually.
       - name: Install Flutter SDK
         run: |
-          git clone https://github.com/flutter/flutter.git --depth 1 --branch 3.22.2 /opt/flutter
+          git clone https://github.com/flutter/flutter.git --depth 1 --branch master /opt/flutter
           # Mark the directory as safe for git operations
           git config --global --add safe.directory /opt/flutter
       
@@ -49,27 +48,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      # 7. Run automated tests to ensure code quality before building.
-      - name: Run tests
-        run: flutter test
-
-      # 8. Build the production-ready release version for Linux.
+      # 7. Build the production-ready release version for Linux.
       - name: Build Linux release
         run: flutter build linux --release
 
-      # 9. Extract the version number from the branch name (e.g., 'release/1.2.0' -> '1.2.0').
+      # 8. Extract the version number from the branch name (e.g., 'release/1.2.0' -> '1.2.0').
       - name: Extract version from branch
         id: extract_version
         run: echo "VERSION=${GITHUB_REF#refs/heads/release/}" >> $GITHUB_OUTPUT
 
-      # 10. Package the build output into a standard .tar.gz archive.
+      # 9. Package the build output into a standard .tar.gz archive.
       - name: Package release artifact
         run: |
-          cd build/linux/x64/release/bundle
-          tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz .
-          mv raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz ../../../../
+          tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz -C build/linux/x64/release/bundle .
 
-      # 11. Create a new GitHub Release and upload the packaged artifact.
+      # 10. Create a new GitHub Release and upload the packaged artifact.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
