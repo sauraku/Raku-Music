@@ -16,25 +16,18 @@ jobs:
 
     steps:
       # 1. Install essential build dependencies inside the Arch container using pacman.
-      # base-devel: includes make, gcc, and other essential build tools.
-      # git: for checking out code and cloning Flutter.
-      # clang, cmake, ninja, pkg-config, gtk3: for building the Flutter Linux app.
-      # which, unzip: required by Flutter tool.
-      # ffmpeg: required for running tests that might invoke waveform generation.
-      # libappindicator-gtk3: required by the system_tray plugin.
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm base-devel git clang cmake ninja pkg-config gtk3 which ffmpeg unzip libappindicator-gtk3
 
       # 2. Install the Flutter SDK manually.
-      # Using 'master' branch to match the local environment (3.38.x) which has newer Linux APIs.
       - name: Install Flutter SDK
         run: |
           git clone https://github.com/flutter/flutter.git --depth 1 --branch master /opt/flutter
           # Mark the directory as safe for git operations
           git config --global --add safe.directory /opt/flutter
-      
+
       # 3. Add the Flutter bin directory to the PATH for subsequent steps.
       - name: Add Flutter to PATH
         run: echo "/opt/flutter/bin" >> $GITHUB_PATH
@@ -61,11 +54,10 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/heads/release/}" >> $GITHUB_OUTPUT
 
       # 9. Package the build output into a standard .tar.gz archive.
+      # Using -C to change directory, which avoids the "file changed as we read it" error.
       - name: Package release artifact
         run: |
-          cd build/linux/x64/release/bundle
-          tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz .
-          mv raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz ../../../../
+          tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz -C build/linux/x64/release/bundle .
 
       # 10. Create a new GitHub Release and upload the packaged artifact.
       - name: Create GitHub Release
