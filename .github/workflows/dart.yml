@@ -20,13 +20,13 @@ jobs:
       # clang, cmake, ninja, pkg-config, gtk3: for building the Flutter Linux app.
       # which, unzip: required by Flutter tool.
       # ffmpeg: required for running tests that might invoke waveform generation.
+      # libappindicator-gtk3: required by the system_tray plugin.
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git clang cmake ninja pkg-config gtk3 which ffmpeg unzip
+          pacman -S --noconfirm git clang cmake ninja pkg-config gtk3 which ffmpeg unzip libappindicator-gtk3
 
-      # 2. Install the Flutter SDK manually. This is more reliable in a CI environment
-      # than using an AUR helper. We pin to a specific version for reproducible builds.
+      # 2. Install the Flutter SDK manually.
       - name: Install Flutter SDK
         run: |
           git clone https://github.com/flutter/flutter.git --depth 1 --branch 3.22.2 /opt/flutter
