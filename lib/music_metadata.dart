@@ -6,6 +6,7 @@ class MusicMetadata {
   final String year;
   int playCount;
   bool isLiked;
+  int? color;
 
   MusicMetadata({
     required this.filePath,
@@ -15,6 +16,7 @@ class MusicMetadata {
     required this.year,
     this.playCount = 0,
     this.isLiked = false,
+    this.color,
   });
 
   Map<String, dynamic> toJson() {
@@ -26,6 +28,7 @@ class MusicMetadata {
       'year': year,
       'playCount': playCount,
       'isLiked': isLiked,
+      'color': color,
     };
   }
 
@@ -38,6 +41,7 @@ class MusicMetadata {
       year: json['year'] as String,
       playCount: json['playCount'] as int? ?? 0,
       isLiked: json['isLiked'] as bool? ?? false,
+      color: json['color'] as int?,
     );
   }
 }

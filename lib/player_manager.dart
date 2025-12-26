@@ -9,6 +9,7 @@ abstract class IPlayerManager {
   Stream<Duration> get positionStream;
   Stream<Duration?> get durationStream;
   Stream<MusicMetadata?> get currentSongStream;
+  Stream<LoopMode> get loopModeStream;
   MusicMetadata? get currentSong;
 
   Future<void> playSong(MusicMetadata song, List<MusicMetadata> playlist);
@@ -17,6 +18,7 @@ abstract class IPlayerManager {
   Future<void> seek(Duration position);
   Future<void> next();
   Future<void> previous();
+  Future<void> setLoopMode(LoopMode loopMode);
   void dispose();
 }
 
@@ -34,6 +36,8 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   @override
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
+  @override
+  Stream<LoopMode> get loopModeStream => _audioPlayer.loopModeStream;
   
   // Current song
   final BehaviorSubject<MusicMetadata?> _currentSongSubject = BehaviorSubject<MusicMetadata?>.seeded(null);
@@ -48,16 +52,16 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   bool _playCountIncrementedForCurrentSong = false;
 
   PlayerManager._internal() {
-    // Listen for player state changes to detect when a song finishes
     _audioPlayer.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        // The song finished naturally, auto-play next
-        next();
+        // Let just_audio handle looping, only auto-play next if not looping
+        if (_audioPlayer.loopMode != LoopMode.one) {
+          next();
+        }
       }
       _updatePlaybackState(state);
     });
 
-    // Listen for position changes to increment play count
     _audioPlayer.positionStream.listen((position) {
       _updatePlaybackState(_audioPlayer.playerState);
       _checkAndIncrementPlayCount(position);
@@ -111,7 +115,7 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
       title: song.title,
       artist: song.artist,
       duration: _audioPlayer.duration,
-      artUri: null, // Add album art URI if available
+      artUri: null,
     ));
   }
 
@@ -120,7 +124,7 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
     _playlist = playlist;
     _currentIndex = playlist.indexOf(song);
     _currentSongSubject.add(song);
-    _playCountIncrementedForCurrentSong = false; // Reset for new song
+    _playCountIncrementedForCurrentSong = false;
     
     try {
       await _audioPlayer.setFilePath(song.filePath);
@@ -151,6 +155,9 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
     if (_currentIndex < _playlist.length - 1) {
       _currentIndex++;
       await playSong(_playlist[_currentIndex], _playlist);
+    } else if (_audioPlayer.loopMode == LoopMode.all) {
+      _currentIndex = 0;
+      await playSong(_playlist[_currentIndex], _playlist);
     }
   }
 
@@ -167,6 +174,11 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
 
   @override
   Future<void> skipToPrevious() => previous();
+
+  @override
+  Future<void> setLoopMode(LoopMode loopMode) async {
+    await _audioPlayer.setLoopMode(loopMode);
+  }
 
   @override
   void dispose() {
