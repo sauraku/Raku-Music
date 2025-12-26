@@ -1,0 +1,82 @@
+name: Build and Release Raku Music (Arch Linux)
+
+# This workflow is triggered when a new branch starting with 'release/' is pushed.
+on:
+  push:
+    branches:
+      - 'release/**'
+
+jobs:
+  build-linux:
+    name: Build Arch Linux Release
+    # The host machine is still Ubuntu, but all steps will run inside the specified container.
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      # 1. Install essential build dependencies inside the Arch container using pacman.
+      # git: for checking out code and cloning Flutter.
+      # clang, cmake, ninja, pkg-config, gtk3: for building the Flutter Linux app.
+      # which: required by Flutter tool.
+      # ffmpeg: required for running tests that might invoke waveform generation.
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git clang cmake ninja pkg-config gtk3 which ffmpeg
+
+      # 2. Install the Flutter SDK manually. This is more reliable in a CI environment
+      # than using an AUR helper. We pin to a specific version for reproducible builds.
+      - name: Install Flutter SDK
+        run: |
+          git clone https://github.com/flutter/flutter.git --depth 1 --branch 3.22.2 /opt/flutter
+          # Mark the directory as safe for git operations
+          git config --global --add safe.directory /opt/flutter
+      
+      # 3. Add the Flutter bin directory to the PATH for subsequent steps.
+      - name: Add Flutter to PATH
+        run: echo "/opt/flutter/bin" >> $GITHUB_PATH
+
+      # 4. Checkout the application source code into the container's workspace.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 5. Verify the Flutter installation and environment.
+      - name: Verify Flutter setup
+        run: flutter doctor -v
+
+      # 6. Get the project's Flutter dependencies.
+      - name: Get dependencies
+        run: flutter pub get
+
+      # 7. Run automated tests to ensure code quality before building.
+      - name: Run tests
+        run: flutter test
+
+      # 8. Build the production-ready release version for Linux.
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      # 9. Extract the version number from the branch name (e.g., 'release/1.2.0' -> '1.2.0').
+      - name: Extract version from branch
+        id: extract_version
+        run: echo "VERSION=${GITHUB_REF#refs/heads/release/}" >> $GITHUB_OUTPUT
+
+      # 10. Package the build output into a standard .tar.gz archive.
+      - name: Package release artifact
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz .
+          mv raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz ../../../../
+
+      # 11. Create a new GitHub Release and upload the packaged artifact.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Use the extracted version for the release tag and name.
+          tag_name: v${{ steps.extract_version.outputs.VERSION }}
+          name: Release v${{ steps.extract_version.outputs.VERSION }}
+          # Automatically generate release notes from commit messages.
+          generate_release_notes: true
+          # Upload the .tar.gz file as a release asset.
+          files: raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz
