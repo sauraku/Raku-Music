@@ -1,0 +1,152 @@
+import 'package:flutter/material.dart';
+import 'music_metadata.dart';
+import 'music_service.dart';
+import 'player_manager.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final MusicService _musicService = MusicService();
+  final PlayerManager _playerManager = PlayerManager();
+  List<MusicMetadata> _allSongs = [];
+  List<MusicMetadata> _filteredSongs = [];
+  bool _isLoading = true;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSongs();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query.length >= 3) {
+      setState(() {
+        _filteredSongs = _allSongs.where((song) {
+          final titleLower = song.title.toLowerCase();
+          final artistLower = song.artist.toLowerCase();
+          final searchLower = query.toLowerCase();
+          return titleLower.contains(searchLower) || artistLower.contains(searchLower);
+        }).toList();
+      });
+    } else {
+      setState(() {
+        _filteredSongs = List.from(_allSongs);
+      });
+    }
+  }
+
+  Future<void> _loadSongs() async {
+    final songs = await _musicService.loadMetadata();
+    if (mounted) {
+      setState(() {
+        _allSongs = songs;
+        _filteredSongs = songs;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        _filteredSongs = List.from(_allSongs);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search songs...',
+                  border: InputBorder.none,
+                ),
+                style: const TextStyle(color: Colors.black),
+              )
+            : const Text('Library'),
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: _toggleSearch,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _filteredSongs.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.music_note, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(
+                        _allSongs.isEmpty ? 'No music found' : 'No results found',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      if (_allSongs.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Text('Go to Settings to add music folders'),
+                      ],
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _filteredSongs.length,
+                  itemBuilder: (context, index) {
+                    final song = _filteredSongs[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                        child: const Icon(Icons.music_note),
+                      ),
+                      title: Text(
+                        song.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        '${song.artist} • ${song.album}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          song.isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: song.isLiked ? Colors.red : null,
+                        ),
+                        onPressed: () {
+                          // TODO: Implement like functionality
+                        },
+                      ),
+                      onTap: () {
+                        _playerManager.playSong(song, _filteredSongs);
+                      },
+                    );
+                  },
+                ),
+    );
+  }
+}
