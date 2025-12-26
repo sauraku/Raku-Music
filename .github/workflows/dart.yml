@@ -6,6 +6,10 @@ on:
     branches:
       - 'release/**'
 
+# Grant write permissions to the GITHUB_TOKEN so it can create releases.
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     name: Build Arch Linux Release
@@ -27,7 +31,7 @@ jobs:
           git clone https://github.com/flutter/flutter.git --depth 1 --branch master /opt/flutter
           # Mark the directory as safe for git operations
           git config --global --add safe.directory /opt/flutter
-
+      
       # 3. Add the Flutter bin directory to the PATH for subsequent steps.
       - name: Add Flutter to PATH
         run: echo "/opt/flutter/bin" >> $GITHUB_PATH
@@ -54,7 +58,6 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/heads/release/}" >> $GITHUB_OUTPUT
 
       # 9. Package the build output into a standard .tar.gz archive.
-      # Using -C to change directory, which avoids the "file changed as we read it" error.
       - name: Package release artifact
         run: |
           tar -czvf raku-music-v${{ steps.extract_version.outputs.VERSION }}.tar.gz -C build/linux/x64/release/bundle .
