@@ -26,6 +26,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   final MusicService _musicService = MusicService();
   Color? _backgroundColor;
   Color? _accentColor;
+  Color? _textColor;
   Future<List<double>?>? _waveformFuture;
   Future<File?>? _artFuture;
   bool _isAnimationCompleted = false;
@@ -112,6 +113,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       setState(() {
         _backgroundColor = null;
         _accentColor = null;
+        _textColor = null;
       });
     }
   }
@@ -121,6 +123,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     setState(() {
       _backgroundColor = color;
       _accentColor = isDark ? _lighten(color, 0.4) : _darken(color, 0.4);
+      _textColor = isDark ? Colors.white : Colors.black;
     });
   }
 
@@ -145,6 +148,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     });
   }
 
+  void _togglePlayPause() {
+    _playerManager.togglePlayPause();
+  }
+
   void _toggleLoopMode(LoopMode currentMode) {
     LoopMode nextMode;
     switch (currentMode) {
@@ -161,12 +168,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     _playerManager.setLoopMode(nextMode);
   }
 
-  void _showSpeedDialog(BuildContext context, Color accentColor) {
+  void _showSpeedDialog(BuildContext context) {
+    final dialogBackgroundColor = _accentColor ?? Theme.of(context).colorScheme.primary;
+    final sliderActiveColor = _backgroundColor ?? Theme.of(context).scaffoldBackgroundColor;
+    final dialogTextColor = dialogBackgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Playback Speed'),
+          backgroundColor: dialogBackgroundColor,
+          title: Text('Playback Speed', style: TextStyle(color: dialogTextColor)),
           content: StreamBuilder<double>(
             stream: _playerManager.speedStream,
             builder: (context, snapshot) {
@@ -174,13 +186,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('${speed.toStringAsFixed(1)}x', style: Theme.of(context).textTheme.headlineMedium),
+                  Text(
+                    '${speed.toStringAsFixed(1)}x',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: dialogTextColor),
+                  ),
                   Slider(
                     value: speed,
                     min: 0.5,
                     max: 2.0,
                     divisions: 15,
-                    activeColor: accentColor,
+                    activeColor: sliderActiveColor,
+                    inactiveColor: sliderActiveColor.withOpacity(0.3),
                     onChanged: (value) {
                       _playerManager.setSpeed(value);
                     },
@@ -192,7 +208,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close', style: TextStyle(color: accentColor)),
+              child: Text('Close', style: TextStyle(color: dialogTextColor)),
             ),
           ],
         );
@@ -203,6 +219,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   @override
   Widget build(BuildContext context) {
     final accentColor = _accentColor ?? Theme.of(context).colorScheme.primary;
+    final textColor = _textColor ?? Theme.of(context).textTheme.bodyMedium?.color;
+    final secondaryTextColor = textColor?.withOpacity(0.7);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500),
@@ -216,15 +234,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.keyboard_arrow_down),
+                icon: Icon(Icons.keyboard_arrow_down, color: textColor),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-              title: const Text('Now Playing'),
+              title: Text('Now Playing', style: TextStyle(color: textColor)),
               centerTitle: true,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.speed),
-                  onPressed: () => _showSpeedDialog(context, accentColor),
+                  icon: Icon(Icons.speed, color: textColor),
+                  onPressed: () => _showSpeedDialog(context),
                 ),
               ],
             ),
@@ -246,7 +264,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     // Album Art
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => _playerManager.togglePlayPause(),
+                        onTap: _togglePlayPause,
                         child: AspectRatio(
                           aspectRatio: 1,
                           child: FutureBuilder<File?>(
@@ -290,6 +308,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                       song.title,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: textColor,
                           ),
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -299,7 +318,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                     Text(
                       song.artist,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: secondaryTextColor,
                           ),
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -347,7 +366,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                           return Center(
                                             child: LinearProgressIndicator(
                                               value: progress,
-                                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                              backgroundColor: secondaryTextColor?.withOpacity(0.2),
                                               valueColor: AlwaysStoppedAnimation<Color>(
                                                 accentColor,
                                               ),
@@ -369,12 +388,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         IconButton(
                           icon: Icon(
                             song.isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: song.isLiked ? Colors.red : null,
+                            color: song.isLiked ? Colors.red : accentColor,
                           ),
                           onPressed: () => _toggleLike(song),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.skip_previous, size: 32),
+                          icon: Icon(Icons.skip_previous, size: 32, color: accentColor),
                           onPressed: _playerManager.previous,
                         ),
                         StreamBuilder<PlayerState>(
@@ -390,25 +409,23 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 margin: const EdgeInsets.all(8.0),
                                 width: 64.0,
                                 height: 64.0,
-                                child: const CircularProgressIndicator(),
+                                child: CircularProgressIndicator(color: accentColor),
                               );
                             } else if (playing != true) {
                               return IconButton(
-                                icon: const Icon(Icons.play_circle_fill, size: 64),
-                                color: accentColor,
+                                icon: Icon(Icons.play_circle_fill, size: 64, color: accentColor),
                                 onPressed: _playerManager.play,
                               );
                             } else {
                               return IconButton(
-                                icon: const Icon(Icons.pause_circle_filled, size: 64),
-                                color: accentColor,
+                                icon: Icon(Icons.pause_circle_filled, size: 64, color: accentColor),
                                 onPressed: _playerManager.pause,
                               );
                             }
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.skip_next, size: 32),
+                          icon: Icon(Icons.skip_next, size: 32, color: accentColor),
                           onPressed: _playerManager.next,
                         ),
                         StreamBuilder<LoopMode>(
@@ -420,7 +437,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             switch (loopMode) {
                               case LoopMode.off:
                                 icon = Icons.repeat;
-                                color = Theme.of(context).disabledColor;
+                                color = secondaryTextColor;
                                 break;
                               case LoopMode.all:
                                 icon = Icons.repeat;
