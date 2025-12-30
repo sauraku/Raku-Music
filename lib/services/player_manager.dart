@@ -23,6 +23,7 @@ abstract class IPlayerManager {
   Future<void> previous();
   Future<void> setLoopMode(LoopMode loopMode);
   Future<void> setSpeed(double speed);
+  void updateCurrentSongMetadata(MusicMetadata updatedSong);
   void dispose();
 }
 
@@ -207,6 +208,20 @@ class PlayerManager extends BaseAudioHandler implements IPlayerManager {
   Future<void> setSpeed(double speed) async {
     await _audioPlayer.setSpeed(speed);
     await _settingsService.savePlaybackSpeed(speed);
+  }
+
+  @override
+  void updateCurrentSongMetadata(MusicMetadata updatedSong) {
+    if (_currentSongSubject.value?.filePath == updatedSong.filePath) {
+      _currentSongSubject.add(updatedSong);
+      _updateMediaItem(updatedSong);
+      
+      // Also update the song in the current playlist if it exists
+      final index = _playlist.indexWhere((s) => s.filePath == updatedSong.filePath);
+      if (index != -1) {
+        _playlist[index] = updatedSong;
+      }
+    }
   }
 
   @override

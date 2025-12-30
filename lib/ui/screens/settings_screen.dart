@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 import '../../services/music_service.dart';
 import '../../services/settings_service.dart';
 import '../../main.dart';
@@ -50,6 +52,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               labelType: NavigationRailLabelType.all,
               destinations: const [
                 NavigationRailDestination(
+                  icon: Icon(Icons.settings_applications),
+                  label: Text('General'),
+                ),
+                NavigationRailDestination(
                   icon: Icon(Icons.library_music),
                   label: Text('Library'),
                 ),
@@ -62,13 +68,93 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const VerticalDivider(thickness: 1, width: 1),
             // Right Panel: Content
             Expanded(
-              child: _selectedIndex == 0
-                  ? const LibrarySettingsPanel()
-                  : const ThemeSettingsPanel(),
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: const [
+                  GeneralSettingsPanel(),
+                  LibrarySettingsPanel(),
+                  ThemeSettingsPanel(),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class GeneralSettingsPanel extends StatefulWidget {
+  const GeneralSettingsPanel({super.key});
+
+  @override
+  State<GeneralSettingsPanel> createState() => _GeneralSettingsPanelState();
+}
+
+class _GeneralSettingsPanelState extends State<GeneralSettingsPanel> {
+  final SettingsService _settingsService = SettingsService();
+  CloseBehavior _currentBehavior = CloseBehavior.exit;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final behavior = await _settingsService.loadCloseBehavior();
+    if (mounted) {
+      setState(() {
+        _currentBehavior = behavior;
+      });
+    }
+  }
+
+  void _updateCloseBehavior(CloseBehavior? behavior) {
+    if (behavior != null) {
+      setState(() {
+        _currentBehavior = behavior;
+      });
+      _settingsService.saveCloseBehavior(behavior);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        Text(
+          'On Close Button',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Column(
+            children: [
+              RadioListTile<CloseBehavior>(
+                title: const Text('Exit application'),
+                subtitle: const Text('Closes the app completely.'),
+                value: CloseBehavior.exit,
+                groupValue: _currentBehavior,
+                onChanged: _updateCloseBehavior,
+              ),
+              RadioListTile<CloseBehavior>(
+                title: const Text('Minimize to tray'),
+                subtitle: const Text('Keeps the app running in the background.'),
+                value: CloseBehavior.minimize,
+                groupValue: _currentBehavior,
+                onChanged: _updateCloseBehavior,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -107,6 +193,28 @@ class _LibrarySettingsPanelState extends State<LibrarySettingsPanel> {
 
   Future<void> _scanMusic() async {
     if (_isScanning) return;
+    
+    // Request permissions on Android
+    if (Platform.isAndroid) {
+      var status = await Permission.storage.status;
+      if (!status.isGranted) {
+        status = await Permission.storage.request();
+        if (!status.isGranted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Storage permission denied')),
+            );
+          }
+          return;
+        }
+      }
+      
+      // For Android 13+ (API 33+)
+      if (await Permission.audio.status.isDenied) {
+        await Permission.audio.request();
+      }
+    }
+
     setState(() {
       _isScanning = true;
     });
@@ -147,46 +255,65 @@ class _LibrarySettingsPanelState extends State<LibrarySettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        if (_isScanning) const LinearProgressIndicator(),
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              ListTile(
-                title: const Text('Music Folders', style: TextStyle(fontWeight: FontWeight.bold)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: _pickFolder,
-                ),
+        ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Text(
+              'Music Library',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
               ),
-              if (_musicFolders.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('No folders selected'),
-                )
-              else
-                ..._musicFolders.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final folder = entry.value;
-                  return ListTile(
-                    title: Text(folder),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              elevation: 0,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('Music Folders'),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () => _removeFolder(index),
+                      icon: const Icon(Icons.add),
+                      onPressed: _pickFolder,
                     ),
-                  );
-                }),
-              const Divider(),
-              ListTile(
+                  ),
+                  if (_musicFolders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text('No folders selected. Add a folder to scan for music.'),
+                    )
+                  else
+                    ..._musicFolders.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final folder = entry.value;
+                      return ListTile(
+                        title: Text(folder, overflow: TextOverflow.ellipsis),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () => _removeFolder(index),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Card(
+              elevation: 0,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: ListTile(
                 title: const Text('Rescan Library'),
                 leading: const Icon(Icons.refresh),
                 onTap: _isScanning ? null : _scanMusic,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+        if (_isScanning)
+          const LinearProgressIndicator(),
       ],
     );
   }

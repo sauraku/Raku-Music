@@ -20,6 +20,9 @@ abstract class IMusicService {
   Future<File?> getAlbumArt(MusicMetadata song);
   Future<Color?> getDominantColor(File imageFile);
   Future<void> updateSongColor(MusicMetadata song, int colorValue);
+  Future<void> updateMetadata(MusicMetadata song, String title, String artist, String album);
+  Future<List<String>> getAllArtists();
+  Future<List<String>> getAllAlbums();
 }
 
 class MusicService implements IMusicService {
@@ -31,6 +34,20 @@ class MusicService implements IMusicService {
   Future<List<MusicMetadata>> loadMetadata() async {
     await _repository.init();
     return _repository.getAllSongs();
+  }
+
+  @override
+  Future<List<String>> getAllArtists() async {
+    final songs = await loadMetadata();
+    final artists = songs.map((s) => s.artist).toSet();
+    return artists.toList()..sort();
+  }
+
+  @override
+  Future<List<String>> getAllAlbums() async {
+    final songs = await loadMetadata();
+    final albums = songs.map((s) => s.album).toSet();
+    return albums.toList()..sort();
   }
 
   @override
@@ -146,6 +163,25 @@ class MusicService implements IMusicService {
   Future<Color?> getDominantColor(File imageFile) async {
     final bytes = await imageFile.readAsBytes();
     return _worker.getDominantColor(bytes);
+  }
+
+  @override
+  Future<void> updateMetadata(MusicMetadata song, String title, String artist, String album) async {
+    await _worker.updateMetadata(song.filePath, title, artist, album);
+    
+    // Update local model and repository
+    final updatedSong = MusicMetadata(
+      filePath: song.filePath,
+      title: title,
+      artist: artist,
+      album: album,
+      year: song.year,
+      playCount: song.playCount,
+      isLiked: song.isLiked,
+      color: song.color,
+    );
+    
+    await _repository.updateSong(updatedSong);
   }
 
   bool _isAudioFile(String path) {

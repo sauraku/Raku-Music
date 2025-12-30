@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../app/app_config.dart';
 
+enum CloseBehavior { minimize, exit }
+
 abstract class ISettingsService {
   Future<List<String>> loadMusicFolders();
   Future<void> saveMusicFolders(List<String> folders);
@@ -15,6 +17,8 @@ abstract class ISettingsService {
   Future<void> savePlaybackSpeed(double speed);
   Future<Rect?> loadWindowBounds();
   Future<void> saveWindowBounds(Rect bounds);
+  Future<CloseBehavior> loadCloseBehavior();
+  Future<void> saveCloseBehavior(CloseBehavior behavior);
 }
 
 class SettingsService implements ISettingsService {
@@ -148,6 +152,24 @@ class SettingsService implements ISettingsService {
       'width': bounds.width,
       'height': bounds.height,
     };
+    await _saveSettings(settings);
+  }
+
+  @override
+  Future<CloseBehavior> loadCloseBehavior() async {
+    final settings = await _loadSettings();
+    final String? behaviorName = settings['close_behavior'];
+    if (behaviorName == 'minimize') {
+      return CloseBehavior.minimize;
+    }
+    // Default to exit
+    return CloseBehavior.exit;
+  }
+
+  @override
+  Future<void> saveCloseBehavior(CloseBehavior behavior) async {
+    final settings = await _loadSettings();
+    settings['close_behavior'] = behavior.name;
     await _saveSettings(settings);
   }
 }

@@ -31,6 +31,13 @@ void workerIsolate(SendPort sendPort) {
         final Uint8List imageBytes = request['imageBytes'];
         final result = await _generatePalette(imageBytes);
         replyPort.send(result);
+      } else if (type == 'update_metadata') {
+        final String filePath = request['filePath'];
+        final String title = request['title'];
+        final String artist = request['artist'];
+        final String album = request['album'];
+        await _updateMetadata(filePath, title, artist, album);
+        replyPort.send(true);
       }
     } catch (e) {
       replyPort.send({'error': e.toString()});
@@ -39,6 +46,40 @@ void workerIsolate(SendPort sendPort) {
 }
 
 // --- Task Implementations (run inside the isolate) ---
+
+Future<void> _updateMetadata(String filePath, String title, String artist, String album) async {
+  Tag? existingTag;
+  try {
+    existingTag = await AudioTags.read(filePath);
+  } catch (e) {
+    print('Could not read existing tags to preserve them (likely encoding issue): $e');
+    existingTag = null; // Ensure existingTag is null if read fails
+  }
+
+  try {
+    final tag = Tag(
+      title: title,
+      trackArtist: artist,
+      album: album,
+      // Preserve existing fields if they were successfully read
+      year: existingTag?.year,
+      genre: existingTag?.genre,
+      albumArtist: existingTag?.albumArtist,
+      trackNumber: existingTag?.trackNumber,
+      trackTotal: existingTag?.trackTotal,
+      discNumber: existingTag?.discNumber,
+      discTotal: existingTag?.discTotal,
+      lyrics: existingTag?.lyrics,
+      pictures: existingTag?.pictures ?? [], // If read failed, this will be an empty list
+    );
+    
+    // This write operation should succeed by overwriting the corrupt tag with a clean one.
+    await AudioTags.write(filePath, tag);
+  } catch (e) {
+    print('Isolate update metadata error (even after handling read failure): $e');
+    rethrow;
+  }
+}
 
 Future<int?> _generatePalette(Uint8List imageBytes) async {
   try {
@@ -89,6 +130,12 @@ Future<Uint8List?> _extractAlbumArt(String filePath) async {
 
 Future<List<double>?> _generateWaveform(String filePath) async {
   try {
+    if (Platform.isAndroid) {
+       // TODO: Implement Android-compatible waveform generation
+       // For now, return null or a dummy waveform to prevent crashes
+       return null; 
+    }
+
     final process = await Process.start('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-i', filePath,
       '-ac', '1', '-filter:a', 'aresample=8000', '-map', '0:a',
@@ -195,6 +242,16 @@ class WorkerService {
   Future<Color?> getDominantColor(Uint8List imageBytes) async {
     final colorValue = await _postRequest({'type': 'palette', 'imageBytes': imageBytes});
     return colorValue != null ? Color(colorValue) : null;
+  }
+
+  Future<void> updateMetadata(String filePath, String title, String artist, String album) async {
+    await _postRequest({
+      'type': 'update_metadata',
+      'filePath': filePath,
+      'title': title,
+      'artist': artist,
+      'album': album,
+    });
   }
 
   void dispose() {

@@ -216,6 +216,147 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     );
   }
 
+  void _showEditMetadataDialog(BuildContext context, MusicMetadata song) async {
+    final titleController = TextEditingController(text: song.title);
+    final artistController = TextEditingController(text: song.artist);
+    final albumController = TextEditingController(text: song.album);
+    final dialogBackgroundColor = _accentColor ?? Theme.of(context).colorScheme.primary;
+    final dialogTextColor = dialogBackgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
+    // Fetch autocomplete options
+    final allArtists = await _musicService.getAllArtists();
+    final allAlbums = await _musicService.getAllAlbums();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: dialogBackgroundColor,
+          title: Text('Edit Info', style: TextStyle(color: dialogTextColor)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Title',
+                    labelStyle: TextStyle(color: dialogTextColor.withOpacity(0.7)),
+                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor.withOpacity(0.5))),
+                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor)),
+                  ),
+                  style: TextStyle(color: dialogTextColor),
+                ),
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') {
+                      return const Iterable<String>.empty();
+                    }
+                    return allArtists.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    artistController.text = selection;
+                  },
+                  fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                    // Set initial value
+                    fieldController.text = artistController.text;
+                    return TextField(
+                      controller: fieldController,
+                      focusNode: fieldFocusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Artist',
+                        labelStyle: TextStyle(color: dialogTextColor.withOpacity(0.7)),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor.withOpacity(0.5))),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor)),
+                      ),
+                      style: TextStyle(color: dialogTextColor),
+                      onChanged: (text) => artistController.text = text,
+                    );
+                  },
+                ),
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text == '') {
+                      return const Iterable<String>.empty();
+                    }
+                    return allAlbums.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    albumController.text = selection;
+                  },
+                  fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                    // Set initial value
+                    fieldController.text = albumController.text;
+                    return TextField(
+                      controller: fieldController,
+                      focusNode: fieldFocusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Album',
+                        labelStyle: TextStyle(color: dialogTextColor.withOpacity(0.7)),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor.withOpacity(0.5))),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: dialogTextColor)),
+                      ),
+                      style: TextStyle(color: dialogTextColor),
+                      onChanged: (text) => albumController.text = text,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: TextStyle(color: dialogTextColor)),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _musicService.updateMetadata(
+                    song,
+                    titleController.text,
+                    artistController.text,
+                    albumController.text,
+                  );
+                  
+                  final updatedSong = MusicMetadata(
+                    filePath: song.filePath,
+                    title: titleController.text,
+                    artist: artistController.text,
+                    album: albumController.text,
+                    year: song.year,
+                    playCount: song.playCount,
+                    isLiked: song.isLiked,
+                    color: song.color,
+                  );
+                  _playerManager.updateCurrentSongMetadata(updatedSong);
+
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Metadata updated successfully')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating metadata: $e')),
+                    );
+                  }
+                }
+              },
+              child: Text('Save', style: TextStyle(color: dialogTextColor, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accentColor = _accentColor ?? Theme.of(context).colorScheme.primary;
@@ -229,24 +370,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         backgroundColor: Colors.transparent,
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
-          child: DragToMoveArea(
-            child: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: IconButton(
-                icon: Icon(Icons.keyboard_arrow_down, color: textColor),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              title: Text('Now Playing', style: TextStyle(color: textColor)),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  icon: Icon(Icons.speed, color: textColor),
-                  onPressed: () => _showSpeedDialog(context),
-                ),
-              ],
-            ),
-          ),
+          child: (Platform.isLinux || Platform.isWindows || Platform.isMacOS)
+            ? DragToMoveArea(
+                child: _buildAppBar(context, textColor),
+              )
+            : _buildAppBar(context, textColor),
         ),
         body: SizedBox(
           width: double.infinity,
@@ -388,7 +516,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         IconButton(
                           icon: Icon(
                             song.isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: song.isLiked ? Colors.red : accentColor,
+                            color: song.isLiked ? accentColor : accentColor.withOpacity(0.7),
                           ),
                           onPressed: () => _toggleLike(song),
                         ),
@@ -464,6 +592,34 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context, Color? textColor) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.keyboard_arrow_down, color: textColor),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Text('Now Playing', style: TextStyle(color: textColor)),
+      centerTitle: true,
+      actions: [
+        IconButton(
+          icon: Icon(Icons.edit, color: textColor),
+          onPressed: () {
+            final song = _playerManager.currentSong;
+            if (song != null) {
+              _showEditMetadataDialog(context, song);
+            }
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.speed, color: textColor),
+          onPressed: () => _showSpeedDialog(context),
+        ),
+      ],
     );
   }
 }

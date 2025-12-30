@@ -49,7 +49,7 @@ Future<void> _initSystemTray() async {
     await menu.buildFrom([
       MenuItemLabel(label: 'Show', onClicked: (menuItem) => appWindow.show()),
       MenuItemLabel(label: 'Hide', onClicked: (menuItem) => appWindow.hide()),
-      MenuItemLabel(label: 'Exit', onClicked: (menuItem) => appWindow.close()),
+      MenuItemLabel(label: 'Exit', onClicked: (menuItem) => windowManager.destroy()),
     ]);
     print('DEBUG: Menu built');
 
@@ -74,15 +74,19 @@ void main() async {
   print('DEBUG: main() started');
   WidgetsFlutterBinding.ensureInitialized();
   print('DEBUG: WidgetsFlutterBinding initialized');
+
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    JustAudioMediaKit.ensureInitialized();
+    print('DEBUG: JustAudioMediaKit initialized');
+
+    await windowManager.ensureInitialized();
+    print('DEBUG: windowManager initialized');
+  }
   
-  JustAudioMediaKit.ensureInitialized();
-  print('DEBUG: JustAudioMediaKit initialized');
-  
-  await windowManager.ensureInitialized();
-  print('DEBUG: windowManager initialized');
-  
-  // await _initSystemTray(); // Initialize system tray before the app runs
-  print('DEBUG: _initSystemTray skipped for debugging');
+  // Temporarily disable system tray to prevent crash on startup
+  // if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+  //   await _initSystemTray();
+  // }
 
   print('DEBUG: Initializing AudioService');
   _audioHandler = await AudioService.init(
@@ -100,24 +104,26 @@ void main() async {
   final initialSeedColor = await settingsService.loadSeedColor();
   print('DEBUG: Settings loaded');
 
-  WindowOptions windowOptions = WindowOptions(
-    size: savedBounds?.size ?? const Size(800, 800),
-    center: savedBounds == null,
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.hidden,
-    title: 'Raku Music Dev',
-  );
-  
-  print('DEBUG: Waiting for window to be ready');
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    if (savedBounds != null) {
-      await windowManager.setBounds(savedBounds);
-    }
-    await windowManager.show();
-    await windowManager.focus();
-  });
-  print('DEBUG: Window shown');
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    WindowOptions windowOptions = WindowOptions(
+      size: savedBounds?.size ?? const Size(800, 800),
+      center: savedBounds == null,
+      backgroundColor: Colors.transparent,
+      skipTaskbar: false,
+      titleBarStyle: TitleBarStyle.hidden,
+      title: 'Raku Music Dev',
+    );
+    
+    print('DEBUG: Waiting for window to be ready');
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      if (savedBounds != null) {
+        await windowManager.setBounds(savedBounds);
+      }
+      await windowManager.show();
+      await windowManager.focus();
+    });
+    print('DEBUG: Window shown');
+  }
 
   runApp(RakuMusicApp(
     initialThemeMode: initialThemeMode,
@@ -153,7 +159,9 @@ class _RakuMusicAppState extends State<RakuMusicApp> {
     super.initState();
     _themeMode = widget.initialThemeMode;
     _seedColor = widget.initialSeedColor;
-    windowManager.setPreventClose(true);
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      windowManager.setPreventClose(true);
+    }
   }
 
   void changeTheme(ThemeMode mode) {
@@ -216,21 +224,27 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
-    windowManager.addListener(this);
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      windowManager.addListener(this);
+    }
     _initialScan();
   }
 
   @override
   void dispose() {
-    windowManager.removeListener(this);
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+      windowManager.removeListener(this);
+    }
     super.dispose();
   }
 
   @override
   void onWindowClose() async {
-    bool _isPreventClose = await windowManager.isPreventClose();
-    if (_isPreventClose) {
+    final behavior = await _settingsService.loadCloseBehavior();
+    if (behavior == CloseBehavior.minimize) {
       await windowManager.hide();
+    } else {
+      await windowManager.destroy();
     }
   }
 
@@ -264,7 +278,10 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
     return Scaffold(
       body: Column(
         children: [
-          const CustomTitleBar(),
+          if (Platform.isLinux || Platform.isWindows || Platform.isMacOS)
+            const CustomTitleBar()
+          else
+            SizedBox(height: MediaQuery.of(context).padding.top),
           Expanded(
             child: _pages.elementAt(_selectedIndex),
           ),

@@ -82,7 +82,7 @@ class SongListView extends StatelessWidget {
                   trailing: IconButton(
                     icon: Icon(
                       song.isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: song.isLiked ? Colors.red : null,
+                      color: song.isLiked ? Theme.of(context).colorScheme.primary : null,
                     ),
                     onPressed: () => onToggleLike(song),
                   ),
