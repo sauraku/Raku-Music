@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:palette_generator/palette_generator.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io';
 import 'dart:async';
@@ -31,6 +30,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   Future<File?>? _artFuture;
   bool _isAnimationCompleted = false;
   StreamSubscription<MusicMetadata?>? _songSubscription;
+  File? _currentArtFile;
 
   @override
   void initState() {
@@ -58,6 +58,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   void dispose() {
     _songSubscription?.cancel();
     widget.animation?.removeStatusListener(_onAnimationStatusChanged);
+    // Evict the current image from cache when leaving the screen
+    if (_currentArtFile != null) {
+      final imageProvider = FileImage(_currentArtFile!);
+      imageProvider.evict();
+      // Also evict the resized version
+      ResizeImage(imageProvider, width: 800).evict();
+    }
     super.dispose();
   }
 
@@ -77,6 +84,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   void _loadDataForSong(MusicMetadata? song) {
     if (song == null) return;
+    
+    // Evict previous image if exists
+    if (_currentArtFile != null) {
+      final imageProvider = FileImage(_currentArtFile!);
+      imageProvider.evict();
+      ResizeImage(imageProvider, width: 800).evict();
+      _currentArtFile = null;
+    }
+
     if (mounted) {
       setState(() {
         _artFuture = _musicService.getAlbumArt(song);
@@ -99,17 +115,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     // 2. If not, generate and save it
     final artFile = await _artFuture;
     if (artFile != null) {
-      final palette = await PaletteGenerator.fromImageProvider(
-        FileImage(artFile),
-        maximumColorCount: 20,
-      );
-      final color = palette.dominantColor?.color;
+      _currentArtFile = artFile;
+      // Use WorkerService to get dominant color instead of PaletteGenerator
+      // This avoids creating a UI image and uploading texture to GPU
+      final color = await _musicService.getDominantColor(artFile);
+
       if (color != null && mounted) {
         _setColorsFromPalette(color);
         // Save the color for future use
         await _musicService.updateSongColor(song, color.value);
       }
     } else if (mounted) {
+      // Reset colors if no album art is available
       setState(() {
         _backgroundColor = null;
         _accentColor = null;
@@ -415,13 +432,21 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                     ],
                                     image: artFile != null
                                         ? DecorationImage(
-                                            image: FileImage(artFile),
+                                            image: ResizeImage(FileImage(artFile), width: 800),
                                             fit: BoxFit.cover,
                                           )
                                         : null,
                                   ),
                                   child: artFile == null
-                                      ? const Icon(Icons.music_note, size: 120)
+                                      ? LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            return Icon(
+                                              Icons.music_note,
+                                              size: constraints.maxWidth * 0.7,
+                                              color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.5),
+                                            );
+                                          },
+                                        )
                                       : null,
                                 ),
                               );

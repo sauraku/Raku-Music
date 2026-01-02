@@ -18,7 +18,6 @@ class SongListView extends StatelessWidget {
   void _shufflePlay() {
     if (songs.isEmpty) return;
     final random = Random();
-    final index = random.nextInt(songs.length);
     final shuffledList = List<MusicMetadata>.from(songs)..shuffle(random);
     playerManager.playSong(shuffledList[0], shuffledList);
   }

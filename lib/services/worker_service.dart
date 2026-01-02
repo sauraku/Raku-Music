@@ -121,7 +121,27 @@ Future<int?> _generatePalette(Uint8List imageBytes) async {
 Future<Uint8List?> _extractAlbumArt(String filePath) async {
   try {
     final tag = await AudioTags.read(filePath);
-    return tag?.pictures?.first.bytes;
+    final picture = tag?.pictures?.first;
+    if (picture == null) return null;
+
+    // Resize image if it's too large to save memory
+    // We decode it using the 'image' package which is pure Dart and runs in the isolate
+    final image = img.decodeImage(picture.bytes);
+    if (image == null) return picture.bytes;
+
+    // If image is larger than 800x800, resize it
+    if (image.width > 800 || image.height > 800) {
+      final resized = img.copyResize(
+        image, 
+        width: image.width > image.height ? 800 : null,
+        height: image.height >= image.width ? 800 : null,
+        interpolation: img.Interpolation.average,
+      );
+      // Encode back to JPEG with reduced quality
+      return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
+    }
+
+    return picture.bytes;
   } catch (e) {
     print('Isolate album art error: $e');
     return null;

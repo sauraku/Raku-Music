@@ -75,6 +75,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print('DEBUG: WidgetsFlutterBinding initialized');
 
+  // Limit image cache to avoid high VRAM usage
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 1024 * 1024 * 200; // 200 MB
+
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     JustAudioMediaKit.ensureInitialized();
     print('DEBUG: JustAudioMediaKit initialized');
@@ -283,7 +286,10 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
           else
             SizedBox(height: MediaQuery.of(context).padding.top),
           Expanded(
-            child: _pages.elementAt(_selectedIndex),
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: _pages,
+            ),
           ),
           const MiniPlayer(),
         ],
