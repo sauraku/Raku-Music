@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'package:audiotags/audiotags.dart';
 import 'package:image/image.dart' as img;
-import 'package:palette_generator/palette_generator.dart';
 import 'package:flutter/material.dart';
 
 // --- Isolate Entry Point ---
@@ -121,7 +120,7 @@ Future<int?> _generatePalette(Uint8List imageBytes) async {
 Future<Uint8List?> _extractAlbumArt(String filePath) async {
   try {
     final tag = await AudioTags.read(filePath);
-    final picture = tag?.pictures?.first;
+    final picture = tag?.pictures.first;
     if (picture == null) return null;
 
     // Resize image if it's too large to save memory

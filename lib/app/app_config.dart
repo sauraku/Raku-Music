@@ -20,7 +20,7 @@ class AppConfig {
         // Segregate dev and prod environments
         // kDebugMode is true when running with 'flutter run'
         // kReleaseMode is true when running the installed app (built with --release)
-        final String appName = kDebugMode ? 'raku_music_dev' : 'raku_music';
+        const String appName = kDebugMode ? 'raku_music_dev' : 'raku_music';
         
         final Directory localDir = Directory(p.join(home, '.local', 'share', appName));
         if (!await localDir.exists()) {

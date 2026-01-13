@@ -374,6 +374,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     );
   }
 
+  String _formatDuration(Duration? duration) {
+    if (duration == null) return '--:--';
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+
   @override
   Widget build(BuildContext context) {
     final accentColor = _accentColor ?? Theme.of(context).colorScheme.primary;
@@ -493,12 +501,35 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                       return StreamBuilder<Duration?>(
                                         stream: _playerManager.durationStream,
                                         builder: (context, durationSnapshot) {
-                                          return WaveformProgressBar(
-                                            waveformData: waveformSnapshot.data!,
-                                            progress: positionSnapshot.data ?? Duration.zero,
-                                            total: durationSnapshot.data ?? Duration.zero,
-                                            onSeek: _playerManager.seek,
-                                            color: accentColor,
+                                          return Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: WaveformProgressBar(
+                                                  waveformData: waveformSnapshot.data!,
+                                                  progress: positionSnapshot.data ?? Duration.zero,
+                                                  total: durationSnapshot.data ?? Duration.zero,
+                                                  onSeek: _playerManager.seek,
+                                                  color: accentColor,
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      _formatDuration(positionSnapshot.data),
+                                                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
+                                                    ),
+                                                    Text(
+                                                      _formatDuration(durationSnapshot.data),
+                                                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           );
                                         },
                                       );
@@ -516,14 +547,37 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                           if (duration.inMilliseconds > 0) {
                                             progress = position.inMilliseconds / duration.inMilliseconds;
                                           }
-                                          return Center(
-                                            child: LinearProgressIndicator(
-                                              value: progress,
-                                              backgroundColor: secondaryTextColor?.withOpacity(0.2),
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                accentColor,
+                                          return Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: Center(
+                                                  child: LinearProgressIndicator(
+                                                    value: progress,
+                                                    backgroundColor: secondaryTextColor?.withOpacity(0.2),
+                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                      accentColor,
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      _formatDuration(position),
+                                                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
+                                                    ),
+                                                    Text(
+                                                      _formatDuration(duration),
+                                                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           );
                                         },
                                       );

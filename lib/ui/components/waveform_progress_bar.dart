@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 
 class WaveformProgressBar extends StatefulWidget {
   final List<double> waveformData;

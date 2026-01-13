@@ -109,7 +109,7 @@ void main() async {
 
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     WindowOptions windowOptions = WindowOptions(
-      size: savedBounds?.size ?? const Size(800, 800),
+      size: savedBounds?.size ?? const Size(600, 900),
       center: savedBounds == null,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
